@@ -1,0 +1,34 @@
+<launch>
+  <arg name="input_sensor_topic" default="/velodyne_points"/>
+  <arg name="input_odom_topic" default="odom"/>
+  <arg name="input_imu_topic" default="/dvs/imu"/>
+
+  <arg name="base_frame_id" default="base_link"/>
+  <arg name="min_scan_range" default="5.0"/>
+  <arg name="max_scan_range" default="200.0"/>
+  <arg name="min_add_scan_shift" default="1.0"/>
+  <arg name="ndt_res" default="5.0"/>
+  <arg name="trans_eps" default="0.01"/>
+  <arg name="step_size" default="0.1"/>
+  <arg name="max_iter" default="30"/>
+  <arg name="omp_num_thread" default="3"/>
+
+  <node pkg="tf2_ros" exec="static_transform_publisher" name="velodyne_transform_publisher" args="1.2 0 2.0 0 0 0 /base_link /velodyne" />
+
+  <node pkg="ndt_slam" exec="ndt_slam_node" name="ndt_slam_node" output="screen">
+    <param name="base_frame_id" value="$(var base_frame_id)"/>
+    <param name="min_scan_range" value="$(var min_scan_range)"/>
+    <param name="max_scan_range" value="$(var max_scan_range)"/>
+    <param name="min_add_scan_shift" value="$(var min_add_scan_shift)"/>
+    <param name="ndt_res" value="$(var ndt_res)"/>
+    <param name="trans_eps" value="$(var trans_eps)"/>
+    <param name="step_size" value="$(var step_size)"/>
+    <param name="max_iter" value="$(var max_iter)"/>
+    <param name="omp_num_thread" value="$(var omp_num_thread)"/>
+    <remap from="points_raw" to="$(var input_sensor_topic)"/>
+    <remap from="odom" to="$(var input_odom_topic)"/>
+    <remap from="imu" to="$(var input_imu_topic)"/>
+  </node>
+
+  <node pkg="rviz2" exec="rviz2" name="rviz2" args="-d $(find-pkg-share ndt_slam)/rviz/ndt_slam.rviz"/>
+</launch>

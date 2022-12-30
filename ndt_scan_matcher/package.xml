@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>ndt_slam</name>
+  <version>0.0.0</version>
+  <description>The ndt_slam package</description>
+  <maintainer email="rottertarmenation.y11.r18@gmail.com">RyuYamamoto</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_cmake_auto</buildtool_depend>
+  <depend>geometry_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>pcl_ros</depend>
+  <depend>rclcpp</depend>
+  <depend>tf2</depend>
+  <depend>tf2_eigen</depend>
+  <depend>tf2_geometry_msgs</depend>
+  <depend>tf</depend>
+  <depend>ndt_omp</depend>
+  <depend>ndt_slam_srvs</depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

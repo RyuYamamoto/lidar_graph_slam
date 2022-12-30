@@ -1,0 +1,3 @@
+[submodule "ndt_omp"]
+	path = ndt_omp
+	url = git@github.com:RyuYamamoto/ndt_omp
