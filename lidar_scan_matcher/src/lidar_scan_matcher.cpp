@@ -1,6 +1,7 @@
 #include "lidar_scan_matcher/lidar_scan_matcher.hpp"
 
-LidarScanMatcher::LidarScanMatcher() : Node("lidar_scan_matcher_node")
+LidarScanMatcher::LidarScanMatcher(const rclcpp::NodeOptions & node_options)
+: Node("lidar_scan_matcher_node", node_options)
 {
   sensor_points_subscriber_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
     "points_raw", rclcpp::SensorDataQoS().keep_last(1),
@@ -40,3 +41,6 @@ pcl::PointCloud<PointType>::Ptr LidarScanMatcher::transform_point_cloud(
 
   return transform_cloud_ptr;
 }
+
+#include "rclcpp_components/register_node_macro.hpp"
+RCLCPP_COMPONENTS_REGISTER_NODE(LidarScanMatcher)

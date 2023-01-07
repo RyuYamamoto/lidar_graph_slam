@@ -25,7 +25,7 @@ using PointType = pcl::PointXYZ;
 class LidarScanMatcher : public rclcpp::Node
 {
 public:
-  LidarScanMatcher();
+  LidarScanMatcher(const rclcpp::NodeOptions & node_options);
   ~LidarScanMatcher() = default;
 
   void callback_cloud(const sensor_msgs::msg::PointCloud2::SharedPtr msg);
