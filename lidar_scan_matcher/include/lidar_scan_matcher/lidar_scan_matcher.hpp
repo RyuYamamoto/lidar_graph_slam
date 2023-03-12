@@ -7,6 +7,7 @@
 #include <nav_msgs/msg/path.hpp>
 #include <sensor_msgs/msg/imu.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
+#include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
 #include <geometry_msgs/msg/transform_stamped.hpp>
 
 #include <tf2_eigen/tf2_eigen.hpp>
@@ -42,11 +43,16 @@ public:
 private:
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr sensor_points_subscriber_;
   rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_subscriber_;
+  rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr scan_matcher_pose_publisher_;
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr scan_matcher_odom_publisher_;
   rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr scan_matcher_path_publisher_;
 
+  pcl::PointCloud<PointType>::Ptr target_cloud_;
+
   // registration
   pcl::Registration<PointType, PointType>::Ptr registration_;
+
+  Eigen::Matrix4f key_frame_;
 
   geometry_msgs::msg::Pose current_pose_;
 
@@ -55,6 +61,9 @@ private:
   tf2_ros::Buffer tf_buffer_{ get_clock() };
   tf2_ros::TransformListener tf_listener_{ tf_buffer_ };
   std::shared_ptr<tf2_ros::TransformBroadcaster> broadcaster_;
+
+  std::string base_frame_id_;
+  std::string sensor_frame_id_;
 };
 
 #endif

@@ -6,11 +6,31 @@ LidarScanMatcher::LidarScanMatcher(const rclcpp::NodeOptions & node_options)
   sensor_points_subscriber_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
     "points_raw", rclcpp::SensorDataQoS().keep_last(1),
     std::bind(&LidarScanMatcher::callback_cloud, this, std::placeholders::_1));
+
+  scan_matcher_odom_publisher_ =
+    this->create_publisher<nav_msgs::msg::Odometry>("scan_matcher_odom", 5);
 }
 
 void LidarScanMatcher::callback_cloud(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 {
   pcl::PointCloud<PointType>::Ptr input_cloud_ptr(new pcl::PointCloud<PointType>);
+  pcl::PointCloud<PointType>::Ptr transform_cloud_ptr(new pcl::PointCloud<PointType>);
+
+  transform_cloud_ptr =
+    transform_point_cloud(base_frame_id_, msg->header.frame_id, msg->header.stamp, input_cloud_ptr);
+
+  if (!target_cloud_) {
+    key_frame_.setIdentity();
+    target_cloud_.reset(new pcl::PointCloud<PointType>);
+    target_cloud_ = transform_cloud_ptr;
+    registration_->setInputTarget(target_cloud_);
+  }
+
+  registration_->setInputSource(transform_cloud_ptr);
+
+  pcl::PointCloud<PointType>::Ptr aligned_cloud_ptr(new pcl::PointCloud<PointType>);
+  registration_->align(*aligned_cloud_ptr, key_frame_);
+
 }
 
 pcl::PointCloud<PointType>::Ptr LidarScanMatcher::transform_point_cloud(
