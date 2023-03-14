@@ -6,6 +6,7 @@
 #include <geometry_msgs/msg/pose.hpp>
 #include <geometry_msgs/msg/transform_stamped.hpp>
 
+#include <tf2_eigen/tf2_eigen.hpp>
 #include <tf2/convert.h>
 
 geometry_msgs::msg::Pose convert_transform_to_pose(

@@ -16,7 +16,9 @@
 
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
+#include <pcl_conversions/pcl_conversions.h>
 #include <pclomp/ndt_omp.h>
+
 #include <tf2/transform_datatypes.h>
 #include <tf2_ros/transform_broadcaster.h>
 #include <tf2_ros/transform_listener.h>

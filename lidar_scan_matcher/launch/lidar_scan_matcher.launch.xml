@@ -1,0 +1,19 @@
+<launch>
+  <arg name="transformation_epsilon" default="0.01"/>
+  <arg name="step_size" default="0.1"/>
+  <arg name="ndt_resolution" default="5.0"/>
+  <arg name="max_iteration" default="30"/>
+  <arg name="omp_num_thread" default="4"/>
+  <arg name="base_frame_id" default="base_link"/>
+
+  <node pkg="lidar_scan_matcher" exec="lidar_scan_matcher_node" name="lidar_scan_matcher_node" output="screen">
+    <remap from="~/points_raw" to="filtered_points"/>
+    <param name="transformation_epsilon" value="$(var transformation_epsilon)"/>
+    <param name="step_size" value="$(var step_size)"/>
+    <param name="ndt_resolution" value="$(var ndt_resolution)"/>
+    <param name="max_iteration" value="$(var max_iteration)"/>
+    <param name="omp_num_thread" value="$(var omp_num_thread)"/>
+    <param name="base_frame_id" value="$(var base_frame_id)"/>
+  </node>
+
+</launch>

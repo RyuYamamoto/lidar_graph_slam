@@ -32,6 +32,8 @@ void LidarScanMatcher::callback_cloud(const sensor_msgs::msg::PointCloud2::Share
   pcl::PointCloud<PointType>::Ptr input_cloud_ptr(new pcl::PointCloud<PointType>);
   pcl::PointCloud<PointType>::Ptr transform_cloud_ptr(new pcl::PointCloud<PointType>);
 
+  pcl::fromROSMsg(*msg, *input_cloud_ptr);
+
   const geometry_msgs::msg::TransformStamped base_to_sensor_transform =
     get_transform(base_frame_id_, msg->header.frame_id);
   transform_cloud_ptr = transform_point_cloud(input_cloud_ptr, base_to_sensor_transform);
@@ -60,7 +62,7 @@ void LidarScanMatcher::callback_cloud(const sensor_msgs::msg::PointCloud2::Share
   const Eigen::Vector3d current_position = translation_.block<3, 1>(0, 3).cast<double>();
   const Eigen::Vector3d previous_position = key_frame_.block<3, 1>(0, 3).cast<double>();
   const double delta = (current_position - previous_position).norm();
-  if (1.0 <= delta) {
+  if (0.2 <= delta) {
     key_frame_ = translation_;
     target_cloud_ = transform_cloud_ptr;
     registration_->setInputTarget(target_cloud_);

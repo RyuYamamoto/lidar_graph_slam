@@ -1,5 +1,5 @@
 <launch>
-  <arg name="leaf_size" default="0.2"/>
+  <arg name="leaf_size" default="0.1"/>
   <arg name="random_sample_num" default="1500.0"/>
   <arg name="min_x" default="-100.0"/>
   <arg name="max_x" default="100.0"/>
