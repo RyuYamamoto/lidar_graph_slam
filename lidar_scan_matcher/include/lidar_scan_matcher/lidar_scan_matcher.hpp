@@ -17,7 +17,10 @@
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
+
 #include <pclomp/ndt_omp.h>
+#include <pcl/registration/gicp.h>
+#include <fast_gicp/gicp/fast_gicp.hpp>
 
 #include <tf2/transform_datatypes.h>
 #include <tf2_ros/transform_broadcaster.h>
@@ -58,14 +61,9 @@ private:
   pcl::PointCloud<PointType>::Ptr target_cloud_;
 
   // registration
-  std::shared_ptr<pclomp::NormalDistributionsTransform<PointType, PointType>> registration_;
+  pcl::Registration<PointType, PointType>::Ptr registration_;
 
-  // registration config
-  double transformation_epsilon_;
-  double step_size_;
-  double ndt_resolution_;
-  int max_iteration_;
-  int omp_num_thread_;
+  std::string registration_type_;
 
   Eigen::Matrix4f key_frame_;
   Eigen::Matrix4f translation_;

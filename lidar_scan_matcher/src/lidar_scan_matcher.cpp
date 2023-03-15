@@ -3,21 +3,48 @@
 LidarScanMatcher::LidarScanMatcher(const rclcpp::NodeOptions & node_options)
 : Node("lidar_scan_matcher_node", node_options)
 {
-  transformation_epsilon_ = this->declare_parameter<double>("transformation_epsilon");
-  step_size_ = this->declare_parameter<double>("step_size");
-  ndt_resolution_ = this->declare_parameter<double>("ndt_resolution");
-  max_iteration_ = this->declare_parameter<int>("max_iteration");
-  omp_num_thread_ = this->declare_parameter<int>("omp_num_thread");
   base_frame_id_ = this->declare_parameter<std::string>("base_frame_id");
 
-  registration_ = std::make_shared<pclomp::NormalDistributionsTransform<PointType, PointType>>();
+  const std::string registration_method =
+    this->declare_parameter<std::string>("registration_method");
 
-  registration_->setTransformationEpsilon(transformation_epsilon_);
-  registration_->setStepSize(step_size_);
-  registration_->setResolution(ndt_resolution_);
-  registration_->setMaximumIterations(max_iteration_);
-  registration_->setNeighborhoodSearchMethod(pclomp::KDTREE);
-  if (0 < omp_num_thread_) registration_->setNumThreads(omp_num_thread_);
+  if (registration_method == "FAST_GICP") {
+    fast_gicp::FastGICP<PointType, PointType>::Ptr fast_gicp(
+      new fast_gicp::FastGICP<PointType, PointType>);
+
+    const int max_iteration = this->declare_parameter<int>("max_iteration");
+    const int omp_num_thread = this->declare_parameter<int>("omp_num_thread");
+    const int correspondence_randomness = this->declare_parameter<int>("correspondence_randomness");
+    const double transformation_epsilon = this->declare_parameter<double>("transformation_epsilon");
+    const double max_correspondence_distance =
+      this->declare_parameter<double>("max_correspondence_distance");
+
+    fast_gicp->setCorrespondenceRandomness(correspondence_randomness);
+    fast_gicp->setMaximumIterations(max_iteration);
+    fast_gicp->setTransformationEpsilon(transformation_epsilon);
+    fast_gicp->setMaxCorrespondenceDistance(max_correspondence_distance);
+    if (0 < omp_num_thread) fast_gicp->setNumThreads(omp_num_thread);
+
+    registration_ = fast_gicp;
+  } else if (registration_method == "NDT_OMP") {
+    pclomp::NormalDistributionsTransform<PointType, PointType>::Ptr ndt_omp(
+      new pclomp::NormalDistributionsTransform<PointType, PointType>);
+
+    const double transformation_epsilon = this->declare_parameter<double>("transformation_epsilon");
+    const double step_size = this->declare_parameter<double>("step_size");
+    const double ndt_resolution = this->declare_parameter<double>("ndt_resolution");
+    const int max_iteration = this->declare_parameter<int>("max_iteration");
+    const int omp_num_thread = this->declare_parameter<int>("omp_num_thread");
+
+    ndt_omp->setTransformationEpsilon(transformation_epsilon);
+    ndt_omp->setStepSize(step_size);
+    ndt_omp->setResolution(ndt_resolution);
+    ndt_omp->setMaximumIterations(max_iteration);
+    ndt_omp->setNeighborhoodSearchMethod(pclomp::KDTREE);
+    if (0 < omp_num_thread) ndt_omp->setNumThreads(omp_num_thread);
+
+    registration_ = ndt_omp;
+  }
 
   sensor_points_subscriber_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
     "points_raw", rclcpp::SensorDataQoS().keep_last(1),
@@ -40,6 +67,7 @@ void LidarScanMatcher::callback_cloud(const sensor_msgs::msg::PointCloud2::Share
 
   if (!target_cloud_) {
     prev_translation_.setIdentity();
+    key_frame_.setIdentity();
     target_cloud_.reset(new pcl::PointCloud<PointType>);
     target_cloud_ = transform_cloud_ptr;
     registration_->setInputTarget(target_cloud_);
@@ -68,12 +96,11 @@ void LidarScanMatcher::callback_cloud(const sensor_msgs::msg::PointCloud2::Share
     registration_->setInputTarget(target_cloud_);
   }
 
-  nav_msgs::msg::Odometry odometry;
-
   Eigen::Vector3d translation = translation_.block<3, 1>(0, 3).cast<double>();
   Eigen::Matrix3d rotation = translation_.block<3, 3>(0, 0).cast<double>();
   Eigen::Quaterniond quat(rotation);
 
+  nav_msgs::msg::Odometry odometry;
   odometry.header.frame_id = "odom";
   odometry.child_frame_id = base_frame_id_;
   odometry.header.stamp = msg->header.stamp;
