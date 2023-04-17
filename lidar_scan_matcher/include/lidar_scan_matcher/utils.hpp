@@ -2,12 +2,15 @@
 #define _UTILS_HPP_
 
 #include <Eigen/Dense>
+#include <tf2_eigen/tf2_eigen.hpp>
 
 #include <geometry_msgs/msg/pose.hpp>
 #include <geometry_msgs/msg/transform_stamped.hpp>
 
-#include <tf2_eigen/tf2_eigen.hpp>
 #include <tf2/convert.h>
+
+namespace utils
+{
 
 geometry_msgs::msg::Pose convert_transform_to_pose(
   const geometry_msgs::msg::TransformStamped transform_stamped)
@@ -31,10 +34,25 @@ Eigen::Matrix4f convert_pose_to_matrix(const geometry_msgs::msg::Pose pose)
   return matrix;
 }
 
+geometry_msgs::msg::Pose convert_matrix_to_pose(const Eigen::Matrix4f matrix)
+{
+  geometry_msgs::msg::Pose pose;
+
+  const Eigen::Vector3d position = matrix.block<3, 1>(0, 3).cast<double>();
+  const Eigen::Quaterniond quaternion(matrix.block<3, 3>(0, 0).cast<double>());
+
+  pose.position = tf2::toMsg(position);
+  pose.orientation = tf2::toMsg(quaternion);
+
+  return pose;
+}
+
 Eigen::Matrix4f convert_transform_to_matrix(
   const geometry_msgs::msg::TransformStamped transform_stamped)
 {
   return convert_pose_to_matrix(convert_transform_to_pose(transform_stamped));
 }
+
+}  // namespace utils
 
 #endif

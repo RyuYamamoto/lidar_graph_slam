@@ -3,11 +3,14 @@
 
 #include "lidar_scan_matcher/utils.hpp"
 
+#include <fast_gicp/gicp/fast_gicp.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <tf2_eigen/tf2_eigen.hpp>
 
 #include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
 #include <geometry_msgs/msg/transform_stamped.hpp>
+#include <lidar_graph_slam_msgs/msg/key_frame.hpp>
+#include <lidar_graph_slam_msgs/msg/key_frame_array.hpp>
 #include <nav_msgs/msg/odometry.hpp>
 #include <nav_msgs/msg/path.hpp>
 #include <sensor_msgs/msg/imu.hpp>
@@ -16,12 +19,9 @@
 
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
-#include <pcl_conversions/pcl_conversions.h>
-
-#include <pclomp/ndt_omp.h>
 #include <pcl/registration/gicp.h>
-#include <fast_gicp/gicp/fast_gicp.hpp>
-
+#include <pcl_conversions/pcl_conversions.h>
+#include <pclomp/ndt_omp.h>
 #include <tf2/transform_datatypes.h>
 #include <tf2_ros/transform_broadcaster.h>
 #include <tf2_ros/transform_listener.h>
@@ -49,10 +49,14 @@ public:
     const geometry_msgs::msg::TransformStamped transform);
   pcl::PointCloud<PointType>::Ptr transform_point_cloud(
     const pcl::PointCloud<PointType>::Ptr input_cloud_ptr, const Eigen::Matrix4f transform_matrix);
+  void publish_tf(
+    const geometry_msgs::msg::Pose pose, const rclcpp::Time stamp, const std::string frame_id,
+    const std::string child_frame_id);
 
 private:
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr sensor_points_subscriber_;
   rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_subscriber_;
+  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr front_end_map_publisher_;
   rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr
     scan_matcher_pose_publisher_;
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr scan_matcher_odom_publisher_;
@@ -64,6 +68,8 @@ private:
   pcl::Registration<PointType, PointType>::Ptr registration_;
 
   std::string registration_type_;
+
+  lidar_graph_slam_msgs::msg::KeyFrameArray key_frame_array_;
 
   Eigen::Matrix4f key_frame_;
   Eigen::Matrix4f translation_;
@@ -79,6 +85,9 @@ private:
 
   std::string base_frame_id_;
   std::string sensor_frame_id_;
+
+  int max_scan_accumulate_num_;
+  double displacement_;
 };
 
 #endif

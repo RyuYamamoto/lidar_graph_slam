@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package format="3">
-  <name>lidar_scan_matcher</name>
+  <name>lidar_graph_slam</name>
   <version>0.1.0</version>
-  <description>The lidar_scan_matcher package</description>
+  <description>The lidar_graph_slam package</description>
   <maintainer email="ryu.yamamoto@tier4.jp">RyuYamamoto</maintainer>
   <license>Apache License 2.0</license>
 
@@ -10,17 +10,8 @@
 
   <depend>rclcpp</depend>
   <depend>rclcpp_components</depend>
-  <depend>tf2</depend>
-  <depend>tf2_ros</depend>
-  <depend>tf2_eigen</depend>
-  <depend>tf2_geometry_msgs</depend>
-  <depend>pcl_ros</depend>
-  <depend>sensor_msgs</depend>
-  <depend>geometry_msgs</depend>
-  <depend>nav_msgs</depend>
-  <depend>ndt_omp</depend>
-  <depend>fast_gicp</depend>
-  <depend>lidar_graph_slam_msgs</depend>
+  <depend>lidar_scan_matcher</depend>
+  <depend>points_prefiltering</depend>
 
   <exec_depend>launch_ros</exec_depend>
   <test_depend>ament_lint_auto</test_depend>

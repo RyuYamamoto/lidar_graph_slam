@@ -3,7 +3,10 @@
   <arg name="base_frame_id" default="base_link"/>
   <arg name="registration_method" default="FAST_GICP"/>
 
-  <arg name="max_iteration" default="30"/>
+  <arg name="displacement" default="1.0"/>
+  <arg name="max_scan_accumulate_num" default="5"/>
+
+  <arg name="max_iteration" default="64"/>
   <arg name="omp_num_thread" default="4"/>
   <arg name="transformation_epsilon" default="0.1"/> <!-- ndt: 0.01 / icp: 0.1-->
 
@@ -19,6 +22,9 @@
     <remap from="~/points_raw" to="filtered_points"/>
 
     <param name="registration_method" value="$(var registration_method)"/>
+
+    <param name="displacement" value="$(var displacement)"/>
+    <param name="max_scan_accumulate_num" value="$(var max_scan_accumulate_num)"/>
 
     <param name="transformation_epsilon" value="$(var transformation_epsilon)"/>
     <param name="step_size" value="$(var step_size)"/>

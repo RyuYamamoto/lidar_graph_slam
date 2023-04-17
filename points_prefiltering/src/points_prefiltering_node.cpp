@@ -22,6 +22,8 @@ public:
     max_y_ = this->declare_parameter<double>("max_y");
     min_z_ = this->declare_parameter<double>("min_z");
     max_z_ = this->declare_parameter<double>("max_z");
+    min_distance_cloud_ = this->declare_parameter<double>("min_distance_cloud");
+    max_distance_cloud_ = this->declare_parameter<double>("max_distance_cloud");
 
     sensor_points_subscriber_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
       "points_raw", rclcpp::SensorDataQoS().keep_last(5),
@@ -36,11 +38,17 @@ public:
     pcl::PointCloud<PointType>::Ptr input_points(new pcl::PointCloud<PointType>);
     pcl::fromROSMsg(*msg, *input_points);
 
+    pcl::PointCloud<PointType>::Ptr dist_filter_points(new pcl::PointCloud<PointType>);
+    distance_filter(input_points, dist_filter_points);
+
     pcl::PointCloud<PointType>::Ptr crop_points(new pcl::PointCloud<PointType>);
-    crop(input_points, crop_points);
+    crop(dist_filter_points, crop_points);
 
     pcl::PointCloud<PointType>::Ptr voxel_filter_points(new pcl::PointCloud<PointType>);
     downsample(crop_points, voxel_filter_points);
+
+    //pcl::PointCloud<PointType>::Ptr outlier_filter_points(new pcl::PointCloud<PointType>);
+    //outlier_filter(voxel_filter_points, outlier_filter_points);
 
     sensor_msgs::msg::PointCloud2 output_msg;
     pcl::toROSMsg(*voxel_filter_points, output_msg);
@@ -57,6 +65,18 @@ public:
       if (
         (min_x_ < point.x and point.x < max_x_) and (min_y_ < point.y and point.y < max_y_) and
         (min_z_ < point.z and point.z < max_z_)) {
+        output_points_ptr->points.emplace_back(point);
+      }
+    }
+  }
+
+  void distance_filter(
+    const pcl::PointCloud<PointType>::Ptr input_points_ptr,
+    const pcl::PointCloud<PointType>::Ptr & output_points_ptr)
+  {
+    for (const auto & point : input_points_ptr->points) {
+      const double distance = point.getVector3fMap().norm();
+      if (min_distance_cloud_ < distance) {
         output_points_ptr->points.emplace_back(point);
       }
     }
@@ -86,6 +106,9 @@ public:
     const pcl::PointCloud<PointType>::Ptr input_points_ptr,
     const pcl::PointCloud<PointType>::Ptr & output_points_ptr)
   {
+    //pcl::Filter<PointType>::Ptr outlier_removal;
+    //outlier_removal->setInputCloud(input_points_ptr);
+    //outlier_removal->filter(*output_points_ptr);
   }
 
 private:
@@ -94,6 +117,9 @@ private:
 
   double leaf_size_;
   double random_sample_num_;
+
+  double min_distance_cloud_;
+  double max_distance_cloud_;
 
   double min_x_;
   double max_x_;
