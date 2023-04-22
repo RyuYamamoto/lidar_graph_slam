@@ -18,6 +18,7 @@
   <depend>sensor_msgs</depend>
   <depend>geometry_msgs</depend>
   <depend>nav_msgs</depend>
+  <depend>visualization_msgs</depend>
   <depend>ndt_omp</depend>
   <depend>fast_gicp</depend>
   <depend>lidar_graph_slam_msgs</depend>

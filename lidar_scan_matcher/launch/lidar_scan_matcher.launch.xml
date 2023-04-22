@@ -1,25 +1,25 @@
 <launch>
 
   <arg name="base_frame_id" default="base_link"/>
-  <arg name="registration_method" default="FAST_GICP"/>
+  <arg name="registration_method" default="NDT_OMP"/>
 
-  <arg name="displacement" default="1.0"/>
-  <arg name="max_scan_accumulate_num" default="5"/>
+  <arg name="displacement" default="5.0"/>
+  <arg name="max_scan_accumulate_num" default="3"/>
 
-  <arg name="max_iteration" default="64"/>
+  <arg name="max_iteration" default="30"/>
   <arg name="omp_num_thread" default="4"/>
-  <arg name="transformation_epsilon" default="0.1"/> <!-- ndt: 0.01 / icp: 0.1-->
+  <arg name="transformation_epsilon" default="0.01"/> <!-- ndt: 0.01 / icp: 0.1-->
 
   <!-- NDT_OMP -->
   <arg name="step_size" default="0.1"/>
-  <arg name="ndt_resolution" default="2.0"/>
+  <arg name="ndt_resolution" default="5.0"/>
 
   <!-- FAST_GICP -->
   <arg name="max_correspondence_distance" default="2.0"/>
   <arg name="correspondence_randomness" default="20"/>
 
   <node pkg="lidar_scan_matcher" exec="lidar_scan_matcher_node" name="lidar_scan_matcher_node" output="screen">
-    <remap from="~/points_raw" to="filtered_points"/>
+    <remap from="points_raw" to="filtered_points"/>
 
     <param name="registration_method" value="$(var registration_method)"/>
 

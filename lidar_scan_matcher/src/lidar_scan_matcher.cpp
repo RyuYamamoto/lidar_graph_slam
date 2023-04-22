@@ -56,10 +56,14 @@ LidarScanMatcher::LidarScanMatcher(const rclcpp::NodeOptions & node_options)
 
   front_end_map_publisher_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
     "local_map", rclcpp::QoS{1}.transient_local());
+  scan_matcher_path_publisher_ =
+    this->create_publisher<nav_msgs::msg::Path>("scan_matcher_path", 5);
   scan_matcher_pose_publisher_ =
     this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("scan_matcher_pose", 5);
   scan_matcher_odom_publisher_ =
     this->create_publisher<nav_msgs::msg::Odometry>("scan_matcher_odom", 5);
+  key_frame_marker_publisher_ = this->create_publisher<visualization_msgs::msg::MarkerArray>(
+    "key_frame_marker", rclcpp::QoS{1}.transient_local());
 }
 
 void LidarScanMatcher::callback_cloud(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
@@ -70,14 +74,14 @@ void LidarScanMatcher::callback_cloud(const sensor_msgs::msg::PointCloud2::Share
   pcl::fromROSMsg(*msg, *input_cloud_ptr);
 
   const geometry_msgs::msg::TransformStamped base_to_sensor_transform =
-    get_transform(base_frame_id_, msg->header.frame_id);
+    get_transform(msg->header.frame_id, base_frame_id_);
   transform_cloud_ptr = transform_point_cloud(input_cloud_ptr, base_to_sensor_transform);
 
   if (!target_cloud_) {
-    std::cout << "init" << std::endl;
     prev_translation_.setIdentity();
     key_frame_.setIdentity();
     target_cloud_.reset(new pcl::PointCloud<PointType>);
+    target_cloud_->header.frame_id = "map";
 
     lidar_graph_slam_msgs::msg::KeyFrame key_frame;
     key_frame.pose = utils::convert_matrix_to_pose(prev_translation_);
@@ -101,7 +105,7 @@ void LidarScanMatcher::callback_cloud(const sensor_msgs::msg::PointCloud2::Share
 
   if (!registration_->hasConverged()) {
     RCLCPP_ERROR(get_logger(), "LiDAR Scan Matching has not Converged.");
-    // return;
+    return;
   }
 
   translation_ = registration_->getFinalTransformation();
@@ -151,12 +155,23 @@ void LidarScanMatcher::callback_cloud(const sensor_msgs::msg::PointCloud2::Share
   odometry.pose.pose.orientation = tf2::toMsg(quaternion);
   scan_matcher_odom_publisher_->publish(odometry);
 
+
   geometry_msgs::msg::PoseWithCovarianceStamped pose_with_covariance;
   pose_with_covariance.header.frame_id = "map";
   pose_with_covariance.header.stamp = msg->header.stamp;
   pose_with_covariance.pose.pose.position = tf2::toMsg(translation);
   pose_with_covariance.pose.pose.orientation = tf2::toMsg(quaternion);
   scan_matcher_pose_publisher_->publish(pose_with_covariance);
+
+  geometry_msgs::msg::PoseStamped pose_stamped;
+  pose_stamped.header.frame_id = "map";
+  pose_stamped.header.stamp = msg->header.stamp;
+  pose_stamped.pose = pose_with_covariance.pose.pose;
+  estimated_path_.poses.emplace_back(pose_stamped);
+  estimated_path_.header = pose_stamped.header;
+  scan_matcher_path_publisher_->publish(estimated_path_);
+
+  publish_key_frame(key_frame_array_, msg->header.stamp);
 
   publish_tf(pose_with_covariance.pose.pose, msg->header.stamp, "map", base_frame_id_);
 }
@@ -203,6 +218,22 @@ pcl::PointCloud<PointType>::Ptr LidarScanMatcher::transform_point_cloud(
   pcl::transformPointCloud(*input_cloud_ptr, *transform_cloud_ptr, transform_matrix);
 
   return transform_cloud_ptr;
+}
+
+void LidarScanMatcher::publish_key_frame(
+  const lidar_graph_slam_msgs::msg::KeyFrameArray key_frame_array, const rclcpp::Time stamp)
+{
+  if (key_frame_array.keyframes.empty()) return;
+
+  visualization_msgs::msg::MarkerArray marker_array;
+  for (std::size_t i = 0; i < key_frame_array.keyframes.size(); i++) {
+    lidar_graph_slam_msgs::msg::KeyFrame key_frame = key_frame_array.keyframes[i];
+    visualization_msgs::msg::Marker marker = utils::create_marker(
+      key_frame.pose, stamp, visualization_msgs::msg::Marker::SPHERE, i, "",
+      utils::create_scale(1.0, 1.0, 1.0), utils::create_color(1.0, 0.0, 1.0, 0.0));
+    marker_array.markers.emplace_back(marker);
+  }
+  key_frame_marker_publisher_->publish(marker_array);
 }
 
 void LidarScanMatcher::publish_tf(

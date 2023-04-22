@@ -16,6 +16,8 @@
 #include <sensor_msgs/msg/imu.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
+#include <visualization_msgs/msg/marker.hpp>
+#include <visualization_msgs/msg/marker_array.hpp>
 
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
@@ -52,6 +54,8 @@ public:
   void publish_tf(
     const geometry_msgs::msg::Pose pose, const rclcpp::Time stamp, const std::string frame_id,
     const std::string child_frame_id);
+  void publish_key_frame(
+    const lidar_graph_slam_msgs::msg::KeyFrameArray key_frame_array, const rclcpp::Time stamp);
 
 private:
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr sensor_points_subscriber_;
@@ -61,6 +65,7 @@ private:
     scan_matcher_pose_publisher_;
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr scan_matcher_odom_publisher_;
   rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr scan_matcher_path_publisher_;
+  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr key_frame_marker_publisher_;
 
   pcl::PointCloud<PointType>::Ptr target_cloud_;
 
@@ -76,6 +81,8 @@ private:
   Eigen::Matrix4f prev_translation_;
 
   geometry_msgs::msg::Pose current_pose_;
+
+  nav_msgs::msg::Path estimated_path_;
 
   std::deque<sensor_msgs::msg::Imu> imu_queue_;
 
