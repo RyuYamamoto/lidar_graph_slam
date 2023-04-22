@@ -1,0 +1,9 @@
+<launch>
+  <arg name="rviz_config" default="$(find-pkg-share lidar_graph_slam)/rviz/rviz.config"/>
+
+  <include file="$(find-pkg-share points_prefiltering)/launch/points_prefiltering.launch.xml"/>
+
+  <include file="$(find-pkg-share lidar_scan_matcher)/launch/lidar_scan_matcher.launch.xml"/>
+
+  <node pkg="rviz2" exec="rviz2" name="rviz2" args="-d $(var rviz_config)"/>
+</launch>

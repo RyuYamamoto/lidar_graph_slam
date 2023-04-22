@@ -1,0 +1,26 @@
+<launch>
+  <arg name="leaf_size" default="0.1"/>
+  <arg name="random_sample_num" default="1500.0"/>
+  <arg name="min_x" default="-100.0"/>
+  <arg name="max_x" default="100.0"/>
+  <arg name="min_y" default="-100.0"/>
+  <arg name="max_y" default="100.0"/>
+  <arg name="min_z" default="-100.0"/>
+  <arg name="max_z" default="100.0"/>
+  <arg name="min_distance_cloud" default="2.0"/>
+  <arg name="max_distance_cloud" default="200.0"/>
+
+  <node pkg="points_prefiltering" exec="points_prefiltering_node" name="points_prefiltering_node" output="screen">
+    <param name="leaf_size" value="$(var leaf_size)"/>
+    <param name="random_sample_num" value="$(var random_sample_num)"/>
+    <param name="min_x" value="$(var min_x)"/>
+    <param name="max_x" value="$(var max_x)"/>
+    <param name="min_y" value="$(var min_y)"/>
+    <param name="max_y" value="$(var max_y)"/>
+    <param name="min_z" value="$(var min_z)"/>
+    <param name="max_z" value="$(var max_z)"/>
+    <param name="min_distance_cloud" value="$(var min_distance_cloud)"/>
+    <param name="max_distance_cloud" value="$(var max_distance_cloud)"/>
+  </node>
+
+</launch>
