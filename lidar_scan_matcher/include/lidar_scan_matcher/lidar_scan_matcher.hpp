@@ -1,7 +1,7 @@
-#ifndef _LIDAR_SCAN_MATCHER_HPP_
-#define _LIDAR_SCAN_MATCHER_HPP_
+#ifndef LIDAR_GRAPH_SLAM__LIDAR_SCAN_MATCHER_HPP_
+#define LIDAR_GRAPH_SLAM__LIDAR_SCAN_MATCHER_HPP_
 
-#include "lidar_scan_matcher/utils.hpp"
+#include "lidar_graph_slam_utils/lidar_graph_slam_utils.hpp"
 
 #include <fast_gicp/gicp/fast_gicp.hpp>
 #include <rclcpp/rclcpp.hpp>
