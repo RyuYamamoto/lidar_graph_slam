@@ -15,3 +15,7 @@ colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
 ```bash
 ros2 launch lidar_graph_slam lidar_graph_slam.launch.xml
 ```
+
+## ToDo
+- [ ] graph based SLAM(loop detect)
+- [ ] save map
