@@ -10,6 +10,8 @@
 
   <depend>rclcpp</depend>
   <depend>rclcpp_components</depend>
+  <depend>lidar_graph_slam_msgs</depend>
+  <depend>lidar_graph_slam_utils</depend>
   <depend>lidar_scan_matcher</depend>
   <depend>points_prefiltering</depend>
 

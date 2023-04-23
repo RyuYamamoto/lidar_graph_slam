@@ -1,18 +1,18 @@
-#ifndef _UTILS_HPP_
-#define _UTILS_HPP_
+#ifndef LIDAR_GRAPH_SLAM__LIDAR_GRAPH_SLAM_UTILS_HPP_
+#define LIDAR_GRAPH_SLAM__LIDAR_GRAPH_SLAM_UTILS_HPP_
 
 #include <Eigen/Dense>
 #include <tf2_eigen/tf2_eigen.hpp>
 
-#include <geometry_msgs/msg/vector3.hpp>
 #include <geometry_msgs/msg/pose.hpp>
 #include <geometry_msgs/msg/transform_stamped.hpp>
+#include <geometry_msgs/msg/vector3.hpp>
 #include <visualization_msgs/msg/marker.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
 
 #include <tf2/convert.h>
 
-namespace utils
+namespace lidar_graph_slam_utils
 {
 
 geometry_msgs::msg::Pose convert_transform_to_pose(
@@ -95,7 +95,6 @@ visualization_msgs::msg::Marker create_marker(
 
   return marker;
 }
-
-}  // namespace utils
+}  // namespace lidar_graph_slam_utils
 
 #endif

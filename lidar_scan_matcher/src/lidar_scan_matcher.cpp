@@ -84,7 +84,7 @@ void LidarScanMatcher::callback_cloud(const sensor_msgs::msg::PointCloud2::Share
     target_cloud_->header.frame_id = "map";
 
     lidar_graph_slam_msgs::msg::KeyFrame key_frame;
-    key_frame.pose = utils::convert_matrix_to_pose(prev_translation_);
+    key_frame.pose = lidar_graph_slam_utils::convert_matrix_to_pose(prev_translation_);
     pcl::toROSMsg(*transform_cloud_ptr, key_frame.cloud);
     key_frame_array_.keyframes.emplace_back(key_frame);
 
@@ -110,7 +110,8 @@ void LidarScanMatcher::callback_cloud(const sensor_msgs::msg::PointCloud2::Share
 
   translation_ = registration_->getFinalTransformation();
   transform_cloud_ptr = transform_point_cloud(
-    input_cloud_ptr, translation_ * utils::convert_transform_to_matrix(base_to_sensor_transform));
+    input_cloud_ptr,
+    translation_ * lidar_graph_slam_utils::convert_transform_to_matrix(base_to_sensor_transform));
 
   prev_translation_ = translation_;
 
@@ -123,7 +124,7 @@ void LidarScanMatcher::callback_cloud(const sensor_msgs::msg::PointCloud2::Share
     target_cloud_->points.clear();
 
     lidar_graph_slam_msgs::msg::KeyFrame key_frame;
-    key_frame.pose = utils::convert_matrix_to_pose(key_frame_);
+    key_frame.pose = lidar_graph_slam_utils::convert_matrix_to_pose(key_frame_);
     pcl::toROSMsg(*transform_cloud_ptr, key_frame.cloud);
     key_frame_array_.keyframes.emplace_back(key_frame);
 
@@ -154,7 +155,6 @@ void LidarScanMatcher::callback_cloud(const sensor_msgs::msg::PointCloud2::Share
   odometry.pose.pose.position = tf2::toMsg(translation);
   odometry.pose.pose.orientation = tf2::toMsg(quaternion);
   scan_matcher_odom_publisher_->publish(odometry);
-
 
   geometry_msgs::msg::PoseWithCovarianceStamped pose_with_covariance;
   pose_with_covariance.header.frame_id = "map";
@@ -228,9 +228,10 @@ void LidarScanMatcher::publish_key_frame(
   visualization_msgs::msg::MarkerArray marker_array;
   for (std::size_t i = 0; i < key_frame_array.keyframes.size(); i++) {
     lidar_graph_slam_msgs::msg::KeyFrame key_frame = key_frame_array.keyframes[i];
-    visualization_msgs::msg::Marker marker = utils::create_marker(
+    visualization_msgs::msg::Marker marker = lidar_graph_slam_utils::create_marker(
       key_frame.pose, stamp, visualization_msgs::msg::Marker::SPHERE, i, "",
-      utils::create_scale(1.0, 1.0, 1.0), utils::create_color(1.0, 0.0, 1.0, 0.0));
+      lidar_graph_slam_utils::create_scale(1.0, 1.0, 1.0),
+      lidar_graph_slam_utils::create_color(1.0, 0.0, 1.0, 0.0));
     marker_array.markers.emplace_back(marker);
   }
   key_frame_marker_publisher_->publish(marker_array);

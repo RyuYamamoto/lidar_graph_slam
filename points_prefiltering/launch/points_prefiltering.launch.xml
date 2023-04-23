@@ -1,6 +1,8 @@
 <launch>
   <arg name="leaf_size" default="0.1"/>
   <arg name="random_sample_num" default="1500.0"/>
+  <arg name="mean_k" default="30"/>
+  <arg name="stddev" default="1.2"/>
   <arg name="min_x" default="-100.0"/>
   <arg name="max_x" default="100.0"/>
   <arg name="min_y" default="-100.0"/>
@@ -13,6 +15,8 @@
   <node pkg="points_prefiltering" exec="points_prefiltering_node" name="points_prefiltering_node" output="screen">
     <param name="leaf_size" value="$(var leaf_size)"/>
     <param name="random_sample_num" value="$(var random_sample_num)"/>
+    <param name="mean_k" value="$(var mean_k)"/>
+    <param name="stddev" value="$(var stddev)"/>
     <param name="min_x" value="$(var min_x)"/>
     <param name="max_x" value="$(var max_x)"/>
     <param name="min_y" value="$(var min_y)"/>
