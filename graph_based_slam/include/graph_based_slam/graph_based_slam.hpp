@@ -35,6 +35,8 @@ private:
   lidar_graph_slam_msgs::msg::KeyFrameArray key_frame_array_;
 
   std::mutex mutex_;
+
+  bool is_initialized_key_frame_{false};
 };
 
 #endif
