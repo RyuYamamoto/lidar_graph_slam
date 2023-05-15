@@ -55,8 +55,7 @@ public:
   void publish_tf(
     const geometry_msgs::msg::Pose pose, const rclcpp::Time stamp, const std::string frame_id,
     const std::string child_frame_id);
-  void publish_key_frame(
-    const lidar_graph_slam_msgs::msg::KeyFrame key_frame);
+  void publish_key_frame(const lidar_graph_slam_msgs::msg::KeyFrame key_frame);
 
 private:
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr sensor_points_subscriber_;
@@ -67,7 +66,6 @@ private:
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr scan_matcher_odom_publisher_;
   rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr scan_matcher_path_publisher_;
   rclcpp::Publisher<lidar_graph_slam_msgs::msg::KeyFrame>::SharedPtr key_frame_publisher_;
-  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr key_frame_marker_publisher_;
 
   pcl::PointCloud<PointType>::Ptr target_cloud_;
 

@@ -1,0 +1,7 @@
+<launch>
+  <arg name="rate" default="1.0"/>
+
+  <node pkg="graph_based_slam" exec="graph_based_slam_node" name="graph_based_slam_node" output="screen">
+    <param name="rate" value="$(var rate)"/>
+  </node>
+</launch>

@@ -5,5 +5,7 @@
 
   <include file="$(find-pkg-share lidar_scan_matcher)/launch/lidar_scan_matcher.launch.xml"/>
 
+  <include file="$(find-pkg-share graph_based_slam)/launch/graph_based_slam.launch.xml"/>
+
   <node pkg="rviz2" exec="rviz2" name="rviz2" args="-d $(var rviz_config)"/>
 </launch>

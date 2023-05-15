@@ -10,10 +10,56 @@
 #include <visualization_msgs/msg/marker.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
 
+#include <gtsam/geometry/Pose3.h>
+#include <gtsam/geometry/Rot3.h>
 #include <tf2/convert.h>
 
 namespace lidar_graph_slam_utils
 {
+
+Eigen::Matrix4f geometry_pose_to_matrix(const geometry_msgs::msg::Pose pose)
+{
+  Eigen::Affine3d affine;
+  tf2::fromMsg(pose, affine);
+  Eigen::Matrix4f matrix = affine.matrix().cast<float>();
+  return matrix;
+}
+
+gtsam::Pose3 geometry_pose_to_gtsam_pose(const geometry_msgs::msg::Pose pose)
+{
+  gtsam::Pose3 gtsam_pose = gtsam::Pose3(
+    gtsam::Quaternion(
+      pose.orientation.w, pose.orientation.x, pose.orientation.y, pose.orientation.z),
+    gtsam::Point3(pose.position.x, pose.position.y, pose.position.z));
+  return gtsam_pose;
+}
+
+geometry_msgs::msg::Pose gtsam_pose_to_geometry_pose(const gtsam::Pose3 gtsam_pose)
+{
+  geometry_msgs::msg::Pose pose;
+  pose.position.x = gtsam_pose.x();
+  pose.position.y = gtsam_pose.y();
+  pose.position.z = gtsam_pose.z();
+
+  gtsam::Quaternion quaternion = gtsam_pose.rotation().toQuaternion();
+  pose.orientation.w = quaternion.w();
+  pose.orientation.x = quaternion.x();
+  pose.orientation.y = quaternion.y();
+  pose.orientation.z = quaternion.z();
+  return pose;
+}
+
+geometry_msgs::msg::Vector3 convert_quaternion_to_euler(
+  const geometry_msgs::msg::Quaternion quaternion)
+{
+  geometry_msgs::msg::Vector3 euler;
+
+  tf2::Quaternion quat(quaternion.x, quaternion.y, quaternion.z, quaternion.w);
+  tf2::Matrix3x3 mat(quat);
+  mat.getRPY(euler.x, euler.y, euler.z);
+
+  return euler;
+}
 
 geometry_msgs::msg::Pose convert_transform_to_pose(
   const geometry_msgs::msg::TransformStamped transform_stamped)

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(lidar_scan_matcher)
+project(graph_based_slam)
 
 if(NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 14)
@@ -10,22 +10,23 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic )
 endif()
 
+find_package(GTSAM REQUIRED)
 find_package(PCL REQUIRED)
 find_package(ament_cmake_auto REQUIRED)
 ament_auto_find_build_dependencies()
 
-include_directories(include ${PCL_INCLUDE_DIRS})
+include_directories(include ${PCL_INCLUDE_DIRS} ${GTSAM_INCLUDE_DIR})
 
-ament_auto_add_library(lidar_scan_matcher SHARED
-  src/lidar_scan_matcher.cpp
+ament_auto_add_library(graph_based_slam SHARED
+  src/graph_based_slam.cpp
 )
 
-rclcpp_components_register_node(lidar_scan_matcher
-  PLUGIN "LidarScanMatcher"
-  EXECUTABLE lidar_scan_matcher_node
+rclcpp_components_register_node(graph_based_slam
+  PLUGIN "GraphBasedSLAM"
+  EXECUTABLE graph_based_slam_node
 )
 
-target_link_libraries(lidar_scan_matcher ${PCL_LIBRARIES})
+target_link_libraries(graph_based_slam ${PCL_LIBRARIES} ${GTSAM_LIBRARY_DIRS} gtsam)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package format="3">
-  <name>lidar_scan_matcher</name>
+  <name>graph_based_slam</name>
   <version>0.1.0</version>
-  <description>The lidar_scan_matcher package</description>
+  <description>The graph_based_slam package</description>
   <maintainer email="ryu.yamamoto@tier4.jp">RyuYamamoto</maintainer>
   <license>Apache License 2.0</license>
 
@@ -21,6 +21,7 @@
   <depend>visualization_msgs</depend>
   <depend>ndt_omp</depend>
   <depend>fast_gicp</depend>
+  <depend>gtsam</depend>
   <depend>lidar_graph_slam_utils</depend>
   <depend>lidar_graph_slam_msgs</depend>
 

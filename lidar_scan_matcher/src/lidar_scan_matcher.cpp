@@ -1,5 +1,7 @@
 #include "lidar_scan_matcher/lidar_scan_matcher.hpp"
 
+using namespace lidar_graph_slam_utils;
+
 LidarScanMatcher::LidarScanMatcher(const rclcpp::NodeOptions & node_options)
 : Node("lidar_scan_matcher_node", node_options)
 {
@@ -64,8 +66,6 @@ LidarScanMatcher::LidarScanMatcher(const rclcpp::NodeOptions & node_options)
     this->create_publisher<nav_msgs::msg::Odometry>("scan_matcher_odom", 5);
   key_frame_publisher_ =
     this->create_publisher<lidar_graph_slam_msgs::msg::KeyFrame>("key_frame", 5);
-  key_frame_marker_publisher_ = this->create_publisher<visualization_msgs::msg::MarkerArray>(
-    "key_frame_marker", rclcpp::QoS{1}.transient_local());
 }
 
 void LidarScanMatcher::callback_cloud(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
@@ -87,7 +87,7 @@ void LidarScanMatcher::callback_cloud(const sensor_msgs::msg::PointCloud2::Share
 
     lidar_graph_slam_msgs::msg::KeyFrame key_frame;
     key_frame.pose = lidar_graph_slam_utils::convert_matrix_to_pose(prev_translation_);
-    pcl::toROSMsg(*transform_cloud_ptr, key_frame.cloud);
+    pcl::toROSMsg(*input_cloud_ptr, key_frame.cloud);
     key_frame_array_.keyframes.emplace_back(key_frame);
 
     *target_cloud_ += *transform_cloud_ptr;
@@ -129,7 +129,7 @@ void LidarScanMatcher::callback_cloud(const sensor_msgs::msg::PointCloud2::Share
     key_frame.header.frame_id = "map";
     key_frame.header.stamp = msg->header.stamp;
     key_frame.pose = lidar_graph_slam_utils::convert_matrix_to_pose(key_frame_);
-    pcl::toROSMsg(*transform_cloud_ptr, key_frame.cloud);
+    pcl::toROSMsg(*input_cloud_ptr, key_frame.cloud);
     key_frame_array_.keyframes.emplace_back(key_frame);
 
     const int sub_map_size = key_frame_array_.keyframes.size();
@@ -137,7 +137,14 @@ void LidarScanMatcher::callback_cloud(const sensor_msgs::msg::PointCloud2::Share
       if ((sub_map_size - 1 - idx) < 0) continue;
       pcl::PointCloud<PointType>::Ptr key_frame_cloud(new pcl::PointCloud<PointType>);
       pcl::fromROSMsg(key_frame_array_.keyframes[sub_map_size - 1 - idx].cloud, *key_frame_cloud);
-      *target_cloud_ += *key_frame_cloud;
+
+      pcl::PointCloud<PointType>::Ptr transformed_key_cloud(new pcl::PointCloud<PointType>);
+      const Eigen::Matrix4f matrix =
+        geometry_pose_to_matrix(key_frame_array_.keyframes[sub_map_size - 1 - idx].pose);
+      transformed_key_cloud = transform_point_cloud(
+        key_frame_cloud,
+        matrix * lidar_graph_slam_utils::convert_transform_to_matrix(base_to_sensor_transform));
+      *target_cloud_ += *transformed_key_cloud;
     }
 
     registration_->setInputTarget(target_cloud_);
@@ -224,8 +231,7 @@ pcl::PointCloud<PointType>::Ptr LidarScanMatcher::transform_point_cloud(
   return transform_cloud_ptr;
 }
 
-void LidarScanMatcher::publish_key_frame(
-  const lidar_graph_slam_msgs::msg::KeyFrame key_frame)
+void LidarScanMatcher::publish_key_frame(const lidar_graph_slam_msgs::msg::KeyFrame key_frame)
 {
   key_frame_publisher_->publish(key_frame);
 }

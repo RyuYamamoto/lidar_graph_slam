@@ -14,6 +14,7 @@
   <depend>lidar_graph_slam_utils</depend>
   <depend>lidar_scan_matcher</depend>
   <depend>points_prefiltering</depend>
+  <depend>graph_based_slam</depend>
 
   <exec_depend>launch_ros</exec_depend>
   <test_depend>ament_lint_auto</test_depend>
