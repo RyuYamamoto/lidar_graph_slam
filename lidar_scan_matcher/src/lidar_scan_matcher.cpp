@@ -86,6 +86,7 @@ void LidarScanMatcher::callback_cloud(const sensor_msgs::msg::PointCloud2::Share
     target_cloud_->header.frame_id = "map";
 
     lidar_graph_slam_msgs::msg::KeyFrame key_frame;
+    key_frame.header = msg->header;
     key_frame.pose = lidar_graph_slam_utils::convert_matrix_to_pose(prev_translation_);
     pcl::toROSMsg(*input_cloud_ptr, key_frame.cloud);
     key_frame_array_.keyframes.emplace_back(key_frame);
@@ -98,6 +99,10 @@ void LidarScanMatcher::callback_cloud(const sensor_msgs::msg::PointCloud2::Share
     local_map.header.stamp = msg->header.stamp;
     pcl::toROSMsg(*target_cloud_, local_map);
     front_end_map_publisher_->publish(local_map);
+
+    publish_key_frame(key_frame);
+
+    return ;
   }
 
   registration_->setInputSource(transform_cloud_ptr);
@@ -122,13 +127,14 @@ void LidarScanMatcher::callback_cloud(const sensor_msgs::msg::PointCloud2::Share
   const double delta = (current_position - previous_position).norm();
   if (displacement_ <= delta) {
     key_frame_ = translation_;
+    accum_distance_ += delta;
 
     target_cloud_->points.clear();
 
     lidar_graph_slam_msgs::msg::KeyFrame key_frame;
-    key_frame.header.frame_id = "map";
-    key_frame.header.stamp = msg->header.stamp;
+    key_frame.header = msg->header;
     key_frame.pose = lidar_graph_slam_utils::convert_matrix_to_pose(key_frame_);
+    key_frame.accum_distance = accum_distance_;
     pcl::toROSMsg(*input_cloud_ptr, key_frame.cloud);
     key_frame_array_.keyframes.emplace_back(key_frame);
 

@@ -3,10 +3,10 @@
   <arg name="base_frame_id" default="base_link"/>
   <arg name="registration_method" default="NDT_OMP"/>
 
-  <arg name="displacement" default="5.0"/>
-  <arg name="max_scan_accumulate_num" default="3"/>
+  <arg name="displacement" default="3.0"/>
+  <arg name="max_scan_accumulate_num" default="1"/>
 
-  <arg name="max_iteration" default="30"/>
+  <arg name="max_iteration" default="64"/>
   <arg name="omp_num_thread" default="4"/>
   <arg name="transformation_epsilon" default="0.01"/> <!-- ndt: 0.01 / icp: 0.1-->
 

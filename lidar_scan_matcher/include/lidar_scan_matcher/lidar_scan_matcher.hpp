@@ -95,6 +95,7 @@ private:
 
   int max_scan_accumulate_num_;
   double displacement_;
+  double accum_distance_{0.0};
 };
 
 #endif

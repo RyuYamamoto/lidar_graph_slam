@@ -1,5 +1,5 @@
 <launch>
-  <arg name="leaf_size" default="0.1"/>
+  <arg name="leaf_size" default="0.25"/>
   <arg name="random_sample_num" default="1500.0"/>
   <arg name="mean_k" default="30"/>
   <arg name="stddev" default="1.2"/>
