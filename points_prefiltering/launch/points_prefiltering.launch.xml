@@ -1,5 +1,5 @@
 <launch>
-  <arg name="leaf_size" default="0.1"/>
+  <arg name="leaf_size" default="0.25"/>
   <arg name="random_sample_num" default="1500.0"/>
   <arg name="mean_k" default="30"/>
   <arg name="stddev" default="1.2"/>
@@ -13,6 +13,7 @@
   <arg name="max_distance_cloud" default="200.0"/>
 
   <node pkg="points_prefiltering" exec="points_prefiltering_node" name="points_prefiltering_node" output="screen">
+    <remap from="points_raw" to="velodyne_points"/>
     <param name="leaf_size" value="$(var leaf_size)"/>
     <param name="random_sample_num" value="$(var random_sample_num)"/>
     <param name="mean_k" value="$(var mean_k)"/>
