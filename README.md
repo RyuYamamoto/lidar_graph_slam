@@ -1,4 +1,4 @@
-# LiDAR Graph SLAW
+# LiDAR Graph SLAM
 
 **InProgress**
 
