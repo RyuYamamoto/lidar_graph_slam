@@ -23,3 +23,4 @@ ros2 launch lidar_graph_slam lidar_graph_slam.launch.xml
 - [ ] save map
 - [ ] improve loop detection
 - [ ] use FPFH
+- [ ] use original KD-Tree
