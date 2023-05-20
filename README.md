@@ -1,4 +1,4 @@
-# lidar_graph_slam
+# LiDAR Graph SLAW
 
 **InProgress**
 
