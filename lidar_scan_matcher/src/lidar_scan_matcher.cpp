@@ -88,6 +88,9 @@ void LidarScanMatcher::callback_cloud(const sensor_msgs::msg::PointCloud2::Share
     lidar_graph_slam_msgs::msg::KeyFrame key_frame;
     key_frame.header = msg->header;
     key_frame.pose = lidar_graph_slam_utils::convert_matrix_to_pose(prev_translation_);
+    key_frame.id = id_;
+    id_++;
+
     pcl::toROSMsg(*input_cloud_ptr, key_frame.cloud);
     key_frame_array_.keyframes.emplace_back(key_frame);
 
@@ -135,6 +138,9 @@ void LidarScanMatcher::callback_cloud(const sensor_msgs::msg::PointCloud2::Share
     key_frame.header = msg->header;
     key_frame.pose = lidar_graph_slam_utils::convert_matrix_to_pose(key_frame_);
     key_frame.accum_distance = accum_distance_;
+    key_frame.id = id_;
+    id_++;
+
     pcl::toROSMsg(*input_cloud_ptr, key_frame.cloud);
     key_frame_array_.keyframes.emplace_back(key_frame);
 

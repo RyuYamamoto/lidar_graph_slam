@@ -10,7 +10,7 @@
   <arg name="min_z" default="-100.0"/>
   <arg name="max_z" default="100.0"/>
   <arg name="min_distance_cloud" default="2.0"/>
-  <arg name="max_distance_cloud" default="200.0"/>
+  <arg name="max_distance_cloud" default="100.0"/>
 
   <node pkg="points_prefiltering" exec="points_prefiltering_node" name="points_prefiltering_node" output="screen">
     <remap from="points_raw" to="velodyne_points"/>

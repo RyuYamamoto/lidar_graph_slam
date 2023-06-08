@@ -7,6 +7,8 @@ GraphBasedSLAM::GraphBasedSLAM(const rclcpp::NodeOptions & node_options)
 {
   search_radius_ = this->declare_parameter<double>("search_radius");
   score_threshold_ = this->declare_parameter<double>("score_threshold");
+  search_for_candidate_threshold_ = this->declare_parameter<double>("search_for_candidate_threshold");
+  accumulate_distance_threshold_ = this->declare_parameter<double>("accumulate_distance_threshold");
   search_key_frame_num_ = this->declare_parameter<int>("search_key_frame_num");
 
   key_frame_subscriber_ = this->create_subscription<lidar_graph_slam_msgs::msg::KeyFrame>(
@@ -44,6 +46,7 @@ pcl::Registration<PointType, PointType>::Ptr GraphBasedSLAM::get_registration(
   pcl::Registration<PointType, PointType>::Ptr registration;
 
   if (registration_method == "FAST_GICP") {
+    RCLCPP_INFO_STREAM(get_logger(), "registration: " << registration_method.c_str());
     fast_gicp::FastGICP<PointType, PointType>::Ptr fast_gicp(
       new fast_gicp::FastGICP<PointType, PointType>);
 
@@ -62,6 +65,7 @@ pcl::Registration<PointType, PointType>::Ptr GraphBasedSLAM::get_registration(
 
     registration = fast_gicp;
   } else if (registration_method == "NDT_OMP") {
+    RCLCPP_INFO_STREAM(get_logger(), "registration: " << registration_method.c_str());
     pclomp::NormalDistributionsTransform<PointType, PointType>::Ptr ndt_omp(
       new pclomp::NormalDistributionsTransform<PointType, PointType>);
 
@@ -80,6 +84,7 @@ pcl::Registration<PointType, PointType>::Ptr GraphBasedSLAM::get_registration(
 
     registration = ndt_omp;
   } else if (registration_method == "GICP") {
+    RCLCPP_INFO_STREAM(get_logger(), "registration: " << registration_method.c_str());
     pclomp::GeneralizedIterativeClosestPoint<PointType, PointType>::Ptr gicp(
       new pclomp::GeneralizedIterativeClosestPoint<PointType, PointType>());
 
@@ -89,10 +94,12 @@ pcl::Registration<PointType, PointType>::Ptr GraphBasedSLAM::get_registration(
     const double transformation_epsilon = this->declare_parameter<double>("transformation_epsilon");
     const double euclidean_fitness_epsilon =
       this->declare_parameter<double>("euclidean_fitness_epsilon");
-    const double ransac_iteration = this->declare_parameter<double>("ransac_iteration");
+    const int ransac_iteration = this->declare_parameter<int>("ransac_iteration");
+    const int max_optimizer_iteration = this->declare_parameter<int>("max_optimizer_iteration");
 
     gicp->setMaxCorrespondenceDistance(correspondence_distance);
     gicp->setMaximumIterations(max_iteration);
+    gicp->setMaximumOptimizerIterations(max_optimizer_iteration);
     gicp->setTransformationEpsilon(transformation_epsilon);
     gicp->setEuclideanFitnessEpsilon(euclidean_fitness_epsilon);
     gicp->setRANSACIterations(ransac_iteration);
@@ -103,7 +110,39 @@ pcl::Registration<PointType, PointType>::Ptr GraphBasedSLAM::get_registration(
   return registration;
 }
 
-bool GraphBasedSLAM::detect_loop(
+bool GraphBasedSLAM::detect_loop_with_accum_dist(
+  const lidar_graph_slam_msgs::msg::KeyFrame latest_key_frame,
+  const lidar_graph_slam_msgs::msg::KeyFrameArray key_frame_array,
+  std::vector<lidar_graph_slam_msgs::msg::KeyFrame> & candidate_key_frame)
+{
+  const rclcpp::Time latest_stamp = latest_key_frame.header.stamp;
+  const Eigen::Vector3d latest_pose{
+    latest_key_frame.pose.position.x, latest_key_frame.pose.position.y,
+    latest_key_frame.pose.position.z};
+  const double latest_accum_dist = latest_key_frame.accum_distance;
+
+  const int key_frame_size = key_frame_array.keyframes.size();
+
+  for (auto key_frame : key_frame_array.keyframes) {
+    if((latest_accum_dist - key_frame.accum_distance) < accumulate_distance_threshold_) {
+      continue;
+    }
+
+    const Eigen::Vector3d key_frame_pose{
+      key_frame.pose.position.x, key_frame.pose.position.y, key_frame.pose.position.z};
+
+    const double key_frame_dist = (latest_pose - key_frame_pose).norm();
+    if(key_frame_dist < search_for_candidate_threshold_) {
+      candidate_key_frame.emplace_back(key_frame);
+    }
+  }
+
+  if(candidate_key_frame.empty()) return false;
+
+  return true;
+}
+
+bool GraphBasedSLAM::detect_loop_with_kd_tree(
   const lidar_graph_slam_msgs::msg::KeyFrame latest_key_frame,
   // const lidar_graph_slam_msgs::msg::KeyFrameArray key_frame_array,
   const pcl::PointCloud<PointType>::Ptr key_frame_cloud,
@@ -111,8 +150,6 @@ bool GraphBasedSLAM::detect_loop(
 {
   rclcpp::Time latest_stamp = latest_key_frame.header.stamp;
   geometry_msgs::msg::Pose latest_pose = latest_key_frame.pose;
-
-  std::lock_guard<std::mutex> lock(mutex_);
 
   // kd_tree_->set_input_cloud(key_frame_array);
   kd_tree_->setInputCloud(key_frame_cloud);
@@ -123,7 +160,6 @@ bool GraphBasedSLAM::detect_loop(
   latest_key_point.x = latest_pose.position.x;
   latest_key_point.y = latest_pose.position.y;
   latest_key_point.z = latest_pose.position.z;
-  // kd_tree_->radius_search(latest_pose, search_radius_, indices);
   kd_tree_->radiusSearch(latest_key_point, search_radius_, indices, dists);
 
   closest_key_frame_id = -1;
@@ -160,92 +196,115 @@ void GraphBasedSLAM::optimization_callback()
 {
   if (key_frame_array_.keyframes.empty()) return;
 
+  std::lock_guard<std::mutex> lock(optimize_thread_mutex_);
+
   const int key_frame_size = key_frame_array_.keyframes.size();
   const auto latest_key_frame = key_frame_array_.keyframes.back();
   pcl::PointCloud<PointType>::Ptr nearest_key_frame_cloud(new pcl::PointCloud<PointType>);
 
-  int closest_key_frame_id;
-  if (!detect_loop(
-        latest_key_frame, key_frame_point_, nearest_key_frame_cloud, closest_key_frame_id)) {
+  //int closest_key_frame_id;
+  //if (!detect_loop_with_kd_tree(
+  //      latest_key_frame, key_frame_point_, nearest_key_frame_cloud, closest_key_frame_id)) {
+  //  return;
+  //}
+
+  std::vector<lidar_graph_slam_msgs::msg::KeyFrame> candidate_key_frame;
+  if(!detect_loop_with_accum_dist(latest_key_frame, key_frame_array_, candidate_key_frame)) {
     return;
   }
-
-  // for visualize loop detection
-  geometry_msgs::msg::PoseStamped pose_to;
-  pose_to.pose = latest_key_frame.pose;
-  pose_to.header = latest_key_frame.header;
-  geometry_msgs::msg::PoseStamped pose_from;
-  pose_from.pose = key_frame_array_.keyframes[closest_key_frame_id].pose;
-  pose_from.header = key_frame_array_.keyframes[closest_key_frame_id].header;
-  candidate_line_.poses.emplace_back(pose_from);
-  candidate_line_.poses.emplace_back(pose_to);
-  candidate_line_.header.frame_id = "map";
-  candidate_line_.header.stamp = latest_key_frame.header.stamp;
-
-  candidate_key_frame_publisher_->publish(candidate_line_);
 
   pcl::PointCloud<PointType>::Ptr latest_key_frame_cloud(new pcl::PointCloud<PointType>);
   pcl::fromROSMsg(latest_key_frame.cloud, *latest_key_frame_cloud);
-  registration_->setInputSource(latest_key_frame_cloud);
-  registration_->setInputTarget(nearest_key_frame_cloud);
+  pcl::PointCloud<PointType>::Ptr transformed_key_frame_cloud(new pcl::PointCloud<PointType>);
+  const Eigen::Matrix4f matrix = geometry_pose_to_matrix(latest_key_frame.pose);
+  transformed_key_frame_cloud = transform_point_cloud(latest_key_frame_cloud, matrix);
+  registration_->setInputTarget(transformed_key_frame_cloud);
 
-  Eigen::Matrix4f initial_pose = convert_pose_to_matrix(latest_key_frame.pose);
+  Eigen::Matrix4f correct_frame;
+  double best_score = std::numeric_limits<double>::max();
+  int loop_id = -1;
+  // for visualize candidate key frame
+  for(auto candidate : candidate_key_frame) {
+    geometry_msgs::msg::PoseStamped pose_to;
+    pose_to.pose = latest_key_frame.pose;
+    pose_to.header = latest_key_frame.header;
+    geometry_msgs::msg::PoseStamped pose_from;
+    pose_from.pose = candidate.pose;
+    pose_from.header = candidate.header;
+    candidate_line_.poses.emplace_back(pose_from);
+    candidate_line_.poses.emplace_back(pose_to);
+    candidate_line_.header.frame_id = "map";
+    candidate_line_.header.stamp = latest_key_frame.header.stamp;
 
-  pcl::PointCloud<PointType>::Ptr output_cloud(new pcl::PointCloud<PointType>);
-  registration_->align(*output_cloud);
+    pcl::PointCloud<PointType>::Ptr candidate_key_frame_cloud(new pcl::PointCloud<PointType>);
+    pcl::fromROSMsg(candidate.cloud, *candidate_key_frame_cloud);
+    pcl::PointCloud<PointType>::Ptr transformed_candidate_key_frame_cloud(new pcl::PointCloud<PointType>);
+    const Eigen::Matrix4f candidate_matrix = geometry_pose_to_matrix(candidate.pose);
+    transformed_candidate_key_frame_cloud = transform_point_cloud(candidate_key_frame_cloud, candidate_matrix);
+    registration_->setInputSource(transformed_candidate_key_frame_cloud);
 
-  const Eigen::Matrix4f transform = registration_->getFinalTransformation();
-  const double fitness_score = registration_->getFitnessScore();
-  const bool has_converged = registration_->hasConverged();
+    pcl::PointCloud<PointType>::Ptr output_cloud(new pcl::PointCloud<PointType>);
+    registration_->align(*output_cloud, geometry_pose_to_matrix(latest_key_frame.pose).inverse() * candidate_matrix);
 
-  if (!has_converged or score_threshold_ < fitness_score) {
-    return;
-  }
+    const Eigen::Matrix4f transform = registration_->getFinalTransformation();
+    const double fitness_score = registration_->getFitnessScore();
+    const bool has_converged = registration_->hasConverged();
 
-  RCLCPP_INFO_STREAM(get_logger(), "fitness_score : " << fitness_score);
-  if (fitness_score < score_threshold_) {
-    RCLCPP_INFO_STREAM(get_logger(), "update pose graph.");
-
-    std::lock_guard<std::mutex> lock(mutex_);
-    // correct position
-    auto gtsam_pose_from = geometry_pose_to_gtsam_pose(convert_matrix_to_pose(transform));
-    // candidate position
-    auto gtsam_pose_to = geometry_pose_to_gtsam_pose(pose_to.pose);
-    gtsam::noiseModel::Diagonal::shared_ptr optimize_noise = gtsam::noiseModel::Diagonal::Variances(
-      (gtsam::Vector(6) << fitness_score, fitness_score, fitness_score, fitness_score,
-       fitness_score, fitness_score)
-        .finished());
-    graph_.add(gtsam::BetweenFactor<gtsam::Pose3>(
-      key_frame_size - 1, closest_key_frame_id, gtsam_pose_from.between(gtsam_pose_to),
-      optimize_noise));
-
-    // update
-    optimizer_.update(graph_);
-    optimizer_.update();
-
-    graph_.resize(0);
-
-    auto current_estimate = optimizer_.calculateEstimate();
-    auto estimated_pose = current_estimate.at<gtsam::Pose3>(current_estimate.size() - 1);
-
-    for (std::size_t idx = 0; idx < current_estimate.size(); idx++) {
-      key_frame_array_.keyframes[idx].pose =
-        gtsam_pose_to_geometry_pose(current_estimate.at<gtsam::Pose3>(idx));
-
-      PointType key_frame_point;
-      key_frame_point.x = key_frame_array_.keyframes[idx].pose.position.x;
-      key_frame_point.y = key_frame_array_.keyframes[idx].pose.position.y;
-      key_frame_point.z = key_frame_array_.keyframes[idx].pose.position.z;
-      key_frame_point_->points[idx] = key_frame_point;
+    if (!has_converged) {
+      std::cerr << "Not Converged." << std::endl;
+      continue;
     }
 
-    publish_map();
+    if(fitness_score < best_score) {
+      best_score = fitness_score;
+      correct_frame = transform;
+      loop_id = candidate.id;
+    }
   }
+  std::cout << "best_score: " << best_score << std::endl;
+  std::cout << "loop id: " << loop_id << std::endl;
+  candidate_key_frame_publisher_->publish(candidate_line_);
+
+  if(score_threshold_ < best_score) return;
+
+  // correct position
+  auto pose_from = geometry_pose_to_gtsam_pose(convert_matrix_to_pose(correct_frame));
+  // candidate position
+  auto pose_to = geometry_pose_to_gtsam_pose(latest_key_frame.pose);
+  gtsam::noiseModel::Diagonal::shared_ptr optimize_noise = gtsam::noiseModel::Diagonal::Variances(
+    (gtsam::Vector(6) << best_score, best_score, best_score, best_score,
+      best_score, best_score)
+      .finished());
+  graph_.add(gtsam::BetweenFactor<gtsam::Pose3>(
+    key_frame_size - 1, loop_id, pose_from.between(pose_to),
+    optimize_noise));
+
+  // update
+  optimizer_.update(graph_);
+  optimizer_.update();
+
+  graph_.resize(0);
+
+  auto current_estimate = optimizer_.calculateEstimate();
+  auto estimated_pose = current_estimate.at<gtsam::Pose3>(current_estimate.size() - 1);
+
+  for (std::size_t idx = 0; idx < current_estimate.size(); idx++) {
+    key_frame_array_.keyframes[idx].pose =
+      gtsam_pose_to_geometry_pose(current_estimate.at<gtsam::Pose3>(idx));
+
+    PointType key_frame_point;
+    key_frame_point.x = key_frame_array_.keyframes[idx].pose.position.x;
+    key_frame_point.y = key_frame_array_.keyframes[idx].pose.position.y;
+    key_frame_point.z = key_frame_array_.keyframes[idx].pose.position.z;
+    key_frame_point_->points[idx] = key_frame_point;
+  }
+
+  publish_map();
 }
 
 void GraphBasedSLAM::key_frame_callback(const lidar_graph_slam_msgs::msg::KeyFrame::SharedPtr msg)
 {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::lock_guard<std::mutex> lock(key_frame_update_mutex_);
   if (!is_initialized_key_frame_) is_initialized_key_frame_ = true;
 
   auto key_frame_size = key_frame_array_.keyframes.size();
@@ -274,6 +333,8 @@ void GraphBasedSLAM::key_frame_callback(const lidar_graph_slam_msgs::msg::KeyFra
   key_frame.header = msg->header;
   key_frame.cloud = msg->cloud;
   key_frame.pose = gtsam_pose_to_geometry_pose(estimated_pose);
+  key_frame.accum_distance = msg->accum_distance;
+  key_frame.id = msg->id;
   key_frame_array_.keyframes.emplace_back(key_frame);
   PointType key_frame_point;
   key_frame_point.x = key_frame.pose.position.x;

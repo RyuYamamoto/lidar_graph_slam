@@ -1,7 +1,7 @@
 <launch>
   <arg name="rviz_config" default="$(find-pkg-share lidar_graph_slam)/rviz/rviz.config"/>
 
-  <node pkg="tf2_ros" exec="static_transform_publisher" name="velodyne_transform_publisher" args="0.0 0 0.0 0 0 0 /base_link /velodyne" />
+  <!--node pkg="tf2_ros" exec="static_transform_publisher" name="velodyne_transform_publisher" args="0.0 0 0.0 0 0 0 /base_link /velodyne" /-->
 
   <include file="$(find-pkg-share points_prefiltering)/launch/points_prefiltering.launch.xml"/>
 

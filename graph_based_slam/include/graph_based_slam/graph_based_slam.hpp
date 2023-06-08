@@ -5,11 +5,11 @@
 #include <lidar_graph_slam_utils/lib/kd_tree.hpp>
 #include <lidar_graph_slam_utils/lidar_graph_slam_utils.hpp>
 #include <rclcpp/rclcpp.hpp>
-#include <nav_msgs/msg/path.hpp>
 
 #include "lidar_graph_slam_msgs/msg/key_frame.hpp"
 #include "lidar_graph_slam_msgs/msg/key_frame_array.hpp"
 #include <geometry_msgs/msg/pose_stamped.hpp>
+#include <nav_msgs/msg/path.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
 
 #include <gtsam/geometry/Pose3.h>
@@ -26,8 +26,8 @@
 #include <pcl/point_types.h>
 #include <pcl/registration/gicp.h>
 #include <pcl_conversions/pcl_conversions.h>
-#include <pclomp/ndt_omp.h>
 #include <pclomp/gicp_omp.h>
+#include <pclomp/ndt_omp.h>
 
 using PointType = pcl::PointXYZ;
 
@@ -37,9 +37,13 @@ public:
   GraphBasedSLAM(const rclcpp::NodeOptions & node_options);
   ~GraphBasedSLAM() = default;
 
-  bool detect_loop(
+  bool detect_loop_with_accum_dist(
     const lidar_graph_slam_msgs::msg::KeyFrame latest_key_frame,
-    //const lidar_graph_slam_msgs::msg::KeyFrameArray key_frame_array,
+    const lidar_graph_slam_msgs::msg::KeyFrameArray key_frame_array,
+    std::vector<lidar_graph_slam_msgs::msg::KeyFrame> &candidate_key_frame);
+
+  bool detect_loop_with_kd_tree(
+    const lidar_graph_slam_msgs::msg::KeyFrame latest_key_frame,
     const pcl::PointCloud<PointType>::Ptr key_frame_cloud,
     pcl::PointCloud<PointType>::Ptr & nearest_key_frame_cloud, int & closest_key_frame_id);
 
@@ -72,7 +76,7 @@ private:
   // registration
   pcl::Registration<PointType, PointType>::Ptr registration_;
 
-  //std::shared_ptr<KDTree> kd_tree_;
+  // std::shared_ptr<KDTree> kd_tree_;
   pcl::KdTreeFLANN<PointType>::Ptr kd_tree_;
 
   gtsam::NonlinearFactorGraph graph_;
@@ -84,12 +88,15 @@ private:
   lidar_graph_slam_msgs::msg::KeyFrameArray key_frame_array_;
   lidar_graph_slam_msgs::msg::KeyFrameArray key_frame_raw_array_;
 
-  std::mutex mutex_;
+  std::mutex optimize_thread_mutex_;
+  std::mutex key_frame_update_mutex_;
 
   bool is_initialized_key_frame_{false};
   int search_key_frame_num_;
   double score_threshold_;
   double search_radius_;
+  double search_for_candidate_threshold_;
+  double accumulate_distance_threshold_;
 
   nav_msgs::msg::Path candidate_line_;
 };

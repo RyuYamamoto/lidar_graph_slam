@@ -1,42 +1,9 @@
 <launch>
-
-  <arg name="base_frame_id" default="base_link"/>
-  <arg name="registration_method" default="NDT_OMP"/>
-
-  <arg name="displacement" default="3.0"/>
-  <arg name="max_scan_accumulate_num" default="1"/>
-
-  <arg name="max_iteration" default="64"/>
-  <arg name="omp_num_thread" default="4"/>
-  <arg name="transformation_epsilon" default="0.01"/> <!-- ndt: 0.01 / icp: 0.1-->
-
-  <!-- NDT_OMP -->
-  <arg name="step_size" default="0.1"/>
-  <arg name="ndt_resolution" default="5.0"/>
-
-  <!-- FAST_GICP -->
-  <arg name="max_correspondence_distance" default="2.0"/>
-  <arg name="correspondence_randomness" default="20"/>
+  <arg name="lidar_scan_matcher_param_path" default="$(find-pkg-share lidar_scan_matcher)/config/lidar_scan_matcher.param.yaml"/>
 
   <node pkg="lidar_scan_matcher" exec="lidar_scan_matcher_node" name="lidar_scan_matcher_node" output="screen">
     <remap from="points_raw" to="filtered_points"/>
-
-    <param name="registration_method" value="$(var registration_method)"/>
-
-    <param name="displacement" value="$(var displacement)"/>
-    <param name="max_scan_accumulate_num" value="$(var max_scan_accumulate_num)"/>
-
-    <param name="transformation_epsilon" value="$(var transformation_epsilon)"/>
-    <param name="step_size" value="$(var step_size)"/>
-    <param name="ndt_resolution" value="$(var ndt_resolution)"/>
-
-    <param name="correspondence_randomness" value="$(var correspondence_randomness)"/>
-    <param name="max_correspondence_distance" value="$(var max_correspondence_distance)"/>
-
-    <param name="max_iteration" value="$(var max_iteration)"/>
-    <param name="omp_num_thread" value="$(var omp_num_thread)"/>
-
-    <param name="base_frame_id" value="$(var base_frame_id)"/>
+    <param from="$(var lidar_scan_matcher_param_path)"/>
   </node>
 
 </launch>
