@@ -1,40 +1,7 @@
 <launch>
-  <arg name="rate" default="3.0"/>
-  <arg name="search_key_frame_num" default="2"/>
-  <arg name="search_radius" default="10.0"/>
-  <arg name="score_threshold" default="50.0"/>
-  <arg name="registration_method" default="GICP"/>
-
-  <arg name="max_iteration" default="100"/>
-  <arg name="omp_num_thread" default="4"/>
-  <arg name="transformation_epsilon" default="0.01"/> <!-- ndt: 0.01 / icp: 0.1-->
-
-  <!-- NDT_OMP -->
-  <arg name="step_size" default="0.1"/>
-  <arg name="ndt_resolution" default="1.5"/>
-
-  <!-- FAST_GICP -->
-  <arg name="max_correspondence_distance" default="2.0"/>
-  <arg name="correspondence_randomness" default="20"/>
-
-  <!-- GICP -->
+  <arg name="graph_based_slam_param_path" default="$(find-pkg-share graph_based_slam)/config/graph_based_slam.param.yaml"/>
 
   <node pkg="graph_based_slam" exec="graph_based_slam_node" name="graph_based_slam_node" output="screen">
-    <param name="rate" value="$(var rate)"/>
-    <param name="search_key_frame_num" value="$(var search_key_frame_num)"/>
-    <param name="search_radius" value="$(var search_radius)"/>
-    <param name="score_threshold" value="$(var score_threshold)"/>
-    <param name="registration_method" value="$(var registration_method)"/>
-
-    <param name="transformation_epsilon" value="$(var transformation_epsilon)"/>
-    <param name="step_size" value="$(var step_size)"/>
-    <param name="ndt_resolution" value="$(var ndt_resolution)"/>
-
-    <param name="correspondence_randomness" value="$(var correspondence_randomness)"/>
-    <param name="max_correspondence_distance" value="$(var max_correspondence_distance)"/>
-
-    <param name="max_iteration" value="$(var max_iteration)"/>
-    <param name="omp_num_thread" value="$(var omp_num_thread)"/>
-
+    <param from="$(var graph_based_slam_param_path)"/>
   </node>
 </launch>
