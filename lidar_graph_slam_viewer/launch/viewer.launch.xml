@@ -1,0 +1,9 @@
+<launch>
+  <arg name="points_map" default="/modified_map"/>
+  <arg name="points_raw" default="/filtered_points"/>
+
+  <node pkg="lidar_graph_slam_viewer" exec="lidar_graph_slam_viewer_node" name="lidar_graph_slam_viewer_node" output="screen">
+    <remap from="points_map" to="$(var points_map)"/>
+    <remap from="points_raw" to="$(var points_raw)"/>
+  </node>
+</launch>
