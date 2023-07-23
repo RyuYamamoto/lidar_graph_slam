@@ -1,22 +1,22 @@
 /graph_based_slam_node:
   ros__parameters:
-    rate: 3.0
-    search_key_frame_num: 3
+    rate: 1.0
+    search_key_frame_num: 20
     search_radius: 50.0
-    score_threshold: 2.5
-    search_for_candidate_threshold: 15.0
-    accumulate_distance_threshold: 25.0
-    registration_method: "FAST_GICP"
+    score_threshold: 0.7
+    search_for_candidate_threshold: 20.0
+    accumulate_distance_threshold: 100.0
+    registration_method: "NDT_OMP"
 
     # Common Settings for Scan Matching
-    max_iteration: 64
-    omp_num_thread: 4
+    max_iteration: 100
+    omp_num_thread: 2
     #transformation_epsilon: 0.01 # NDT_OMP
     transformation_epsilon: 0.01 # GICP
 
     # NDT_OMP
     step_size: 0.1
-    ndt_resolution: 1.5
+    ndt_resolution: 1.0
 
     # FAST_GICP
     max_correspondence_distance: 2.0

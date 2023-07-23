@@ -29,7 +29,7 @@
 #include <tf2_ros/transform_listener.h>
 #include <tf2_sensor_msgs/tf2_sensor_msgs.h>
 
-using PointType = pcl::PointXYZ;
+using PointType = pcl::PointXYZI;
 
 class LidarScanMatcher : public rclcpp::Node
 {
@@ -40,6 +40,9 @@ public:
   void callback_cloud(const sensor_msgs::msg::PointCloud2::SharedPtr msg);
   void callback_imu(const sensor_msgs::msg::Imu::SharedPtr msg);
   void callback_odometry(const nav_msgs::msg::Odometry::SharedPtr msg);
+
+  void correct_imu(const sensor_msgs::msg::Imu imu_msg, const Eigen::Matrix4f & initial_guess);
+  void get_latest_imu_msg(sensor_msgs::msg::Imu & latest_imu_msg);
 
   pcl::Registration<PointType, PointType>::Ptr get_registration();
   nav_msgs::msg::Odometry convert_to_odometry(const geometry_msgs::msg::Pose pose);

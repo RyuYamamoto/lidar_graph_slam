@@ -68,16 +68,21 @@ LidarScanMatcher::LidarScanMatcher(const rclcpp::NodeOptions & node_options)
     this->create_publisher<lidar_graph_slam_msgs::msg::KeyFrame>("key_frame", 5);
 }
 
+void LidarScanMatcher::correct_imu(const sensor_msgs::msg::Imu imu_msg, const Eigen::Matrix4f &initial_guess)
+{
+
+}
+
 void LidarScanMatcher::callback_cloud(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 {
   pcl::PointCloud<PointType>::Ptr input_cloud_ptr(new pcl::PointCloud<PointType>);
-  pcl::PointCloud<PointType>::Ptr transform_cloud_ptr(new pcl::PointCloud<PointType>);
+  pcl::PointCloud<PointType>::Ptr base_to_sensor_cloud(new pcl::PointCloud<PointType>);
 
   pcl::fromROSMsg(*msg, *input_cloud_ptr);
 
   const geometry_msgs::msg::TransformStamped base_to_sensor_transform =
     get_transform(msg->header.frame_id, base_frame_id_);
-  transform_cloud_ptr = transform_point_cloud(input_cloud_ptr, base_to_sensor_transform);
+  base_to_sensor_cloud = transform_point_cloud(input_cloud_ptr, base_to_sensor_transform);
 
   if (!target_cloud_) {
     prev_translation_.setIdentity();
@@ -94,7 +99,7 @@ void LidarScanMatcher::callback_cloud(const sensor_msgs::msg::PointCloud2::Share
     pcl::toROSMsg(*input_cloud_ptr, key_frame.cloud);
     key_frame_array_.keyframes.emplace_back(key_frame);
 
-    *target_cloud_ += *transform_cloud_ptr;
+    *target_cloud_ += *base_to_sensor_cloud;
     registration_->setInputTarget(target_cloud_);
 
     sensor_msgs::msg::PointCloud2 local_map;
@@ -105,10 +110,10 @@ void LidarScanMatcher::callback_cloud(const sensor_msgs::msg::PointCloud2::Share
 
     publish_key_frame(key_frame);
 
-    return ;
+    return;
   }
 
-  registration_->setInputSource(transform_cloud_ptr);
+  registration_->setInputSource(base_to_sensor_cloud);
 
   pcl::PointCloud<PointType>::Ptr aligned_cloud_ptr(new pcl::PointCloud<PointType>);
   registration_->align(*aligned_cloud_ptr, prev_translation_);
@@ -119,6 +124,7 @@ void LidarScanMatcher::callback_cloud(const sensor_msgs::msg::PointCloud2::Share
   }
 
   translation_ = registration_->getFinalTransformation();
+  pcl::PointCloud<PointType>::Ptr transform_cloud_ptr(new pcl::PointCloud<PointType>);
   transform_cloud_ptr = transform_point_cloud(
     input_cloud_ptr,
     translation_ * lidar_graph_slam_utils::convert_transform_to_matrix(base_to_sensor_transform));
@@ -141,7 +147,7 @@ void LidarScanMatcher::callback_cloud(const sensor_msgs::msg::PointCloud2::Share
     key_frame.id = id_;
     id_++;
 
-    pcl::toROSMsg(*input_cloud_ptr, key_frame.cloud);
+    pcl::toROSMsg(*base_to_sensor_cloud, key_frame.cloud);
     key_frame_array_.keyframes.emplace_back(key_frame);
 
     const int sub_map_size = key_frame_array_.keyframes.size();
@@ -153,9 +159,7 @@ void LidarScanMatcher::callback_cloud(const sensor_msgs::msg::PointCloud2::Share
       pcl::PointCloud<PointType>::Ptr transformed_key_cloud(new pcl::PointCloud<PointType>);
       const Eigen::Matrix4f matrix =
         geometry_pose_to_matrix(key_frame_array_.keyframes[sub_map_size - 1 - idx].pose);
-      transformed_key_cloud = transform_point_cloud(
-        key_frame_cloud,
-        matrix * lidar_graph_slam_utils::convert_transform_to_matrix(base_to_sensor_transform));
+      transformed_key_cloud = transform_point_cloud(key_frame_cloud, matrix);
       *target_cloud_ += *transformed_key_cloud;
     }
 

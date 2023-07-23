@@ -21,15 +21,17 @@
 #include <gtsam/nonlinear/Values.h>
 #include <gtsam/slam/BetweenFactor.h>
 #include <gtsam/slam/PriorFactor.h>
+#include <pcl/filters/voxel_grid.h>
 #include <pcl/kdtree/kdtree_flann.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl/registration/gicp.h>
+#include <pcl/registration/icp.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pclomp/gicp_omp.h>
 #include <pclomp/ndt_omp.h>
 
-using PointType = pcl::PointXYZ;
+using PointType = pcl::PointXYZI;
 
 class GraphBasedSLAM : public rclcpp::Node
 {
@@ -40,7 +42,7 @@ public:
   bool detect_loop_with_accum_dist(
     const lidar_graph_slam_msgs::msg::KeyFrame latest_key_frame,
     const lidar_graph_slam_msgs::msg::KeyFrameArray key_frame_array,
-    std::vector<lidar_graph_slam_msgs::msg::KeyFrame> &candidate_key_frame);
+    std::vector<lidar_graph_slam_msgs::msg::KeyFrame> & candidate_key_frame);
 
   bool detect_loop_with_kd_tree(
     const lidar_graph_slam_msgs::msg::KeyFrame latest_key_frame,
@@ -50,11 +52,11 @@ public:
   void key_frame_callback(const lidar_graph_slam_msgs::msg::KeyFrame::SharedPtr msg);
   void optimization_callback();
 
+  void adjust_pose();
+
+  void update_estimate_path();
   void publish_candidate();
-
   void publish_map();
-
-  void publish_key_frame_marker();
 
   pcl::PointCloud<PointType>::Ptr transform_point_cloud(
     const pcl::PointCloud<PointType>::Ptr input_cloud_ptr, const Eigen::Matrix4f transform_matrix);
@@ -64,11 +66,11 @@ public:
 
 private:
   rclcpp::Subscription<lidar_graph_slam_msgs::msg::KeyFrame>::SharedPtr key_frame_subscriber_;
+
+  rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr modified_path_publisher_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr modified_map_publisher_;
-  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr
-    odometry_key_frame_marker_publisher_;
-  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr
-    modified_key_frame_marker_publisher_;
+  rclcpp::Publisher<lidar_graph_slam_msgs::msg::KeyFrameArray>::SharedPtr
+    modified_key_frame_publisher_;
   rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr candidate_key_frame_publisher_;
 
   rclcpp::TimerBase::SharedPtr timer_;
@@ -79,8 +81,11 @@ private:
   // std::shared_ptr<KDTree> kd_tree_;
   pcl::KdTreeFLANN<PointType>::Ptr kd_tree_;
 
+  // voxel grid filtering
+  pcl::VoxelGrid<PointType> voxel_grid_;
+
   gtsam::NonlinearFactorGraph graph_;
-  gtsam::ISAM2 optimizer_;
+  std::shared_ptr<gtsam::ISAM2> optimizer_;
   gtsam::Values initial_estimate_;
   gtsam::noiseModel::Diagonal::shared_ptr prior_noise_;
 
@@ -91,6 +96,7 @@ private:
   std::mutex optimize_thread_mutex_;
   std::mutex key_frame_update_mutex_;
 
+  bool is_loop_closed_{false};
   bool is_initialized_key_frame_{false};
   int search_key_frame_num_;
   double score_threshold_;

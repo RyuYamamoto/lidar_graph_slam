@@ -2,8 +2,8 @@
   ros__parameters:
     base_frame_id: "base_link"
     registration_method: "NDT_OMP"
-    displacement: 3.0
-    max_scan_accumulate_num: 1
+    displacement: 1.0
+    max_scan_accumulate_num: 20
 
     # Common Settings for Scan Matching
     max_iteration: 64
@@ -12,7 +12,7 @@
 
     # NDT_OMP
     step_size: 0.1
-    ndt_resolution: 5.0
+    ndt_resolution: 2.0
 
     # FAST_GICP
     max_correspondence_distance: 2.0

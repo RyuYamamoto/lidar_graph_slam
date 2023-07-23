@@ -13,8 +13,8 @@ endif()
 find_package(ament_cmake_auto REQUIRED)
 ament_auto_find_build_dependencies()
 
-ament_auto_add_library(lidar_graph_slam_utils SHARED
-  src/lidar_graph_slam_utils.cpp
+ament_auto_add_library(${RROJECT_NAME} SHARED
+  src/${RROJECT_NAME}.cpp
 )
 
 if(BUILD_TESTING)
