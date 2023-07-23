@@ -7,7 +7,7 @@
 #include <pcl/filters/voxel_grid.h>
 #include <pcl_conversions/pcl_conversions.h>
 
-using PointType = pcl::PointXYZ;
+using PointType = pcl::PointXYZI;
 
 class PointsPreFiltering : public rclcpp::Node
 {
@@ -52,7 +52,7 @@ public:
     crop(dist_filter_points, crop_points);
 
     pcl::PointCloud<PointType>::Ptr voxel_filter_points(new pcl::PointCloud<PointType>);
-    downsample(crop_points, voxel_filter_points);
+    downsample(dist_filter_points, voxel_filter_points);
 
     pcl::PointCloud<PointType>::Ptr outlier_filter_points(new pcl::PointCloud<PointType>);
     outlier_filter(voxel_filter_points, outlier_filter_points);

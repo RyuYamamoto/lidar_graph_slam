@@ -17,16 +17,16 @@ ament_auto_find_build_dependencies()
 
 include_directories(include ${PCL_INCLUDE_DIRS})
 
-ament_auto_add_library(points_prefiltering SHARED
-  src/points_prefiltering_node.cpp
+ament_auto_add_library(${RROJECT_NAME} SHARED
+  src/${RROJECT_NAME}.cpp
 )
 
-rclcpp_components_register_node(points_prefiltering
+rclcpp_components_register_node(${RROJECT_NAME}
   PLUGIN "PointsPreFiltering"
-  EXECUTABLE points_prefiltering_node
+  EXECUTABLE ${RROJECT_NAME}_node
 )
 
-target_link_libraries(points_prefiltering ${PCL_LIBRARIES})
+target_link_libraries(${RROJECT_NAME} ${PCL_LIBRARIES})
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
