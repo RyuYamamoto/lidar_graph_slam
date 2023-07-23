@@ -16,16 +16,16 @@ ament_auto_find_build_dependencies()
 
 include_directories(include ${PCL_INCLUDE_DIRS})
 
-ament_auto_add_library(lidar_scan_matcher SHARED
-  src/lidar_scan_matcher.cpp
+ament_auto_add_library(${RROJECT_NAME} SHARED
+  src/${RROJECT_NAME}.cpp
 )
 
-rclcpp_components_register_node(lidar_scan_matcher
+rclcpp_components_register_node(${RROJECT_NAME}
   PLUGIN "LidarScanMatcher"
-  EXECUTABLE lidar_scan_matcher_node
+  EXECUTABLE ${RROJECT_NAME}_node
 )
 
-target_link_libraries(lidar_scan_matcher ${PCL_LIBRARIES})
+target_link_libraries(${RROJECT_NAME} ${PCL_LIBRARIES})
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

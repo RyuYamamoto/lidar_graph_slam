@@ -13,7 +13,7 @@ endif()
 find_package(ament_cmake_auto REQUIRED)
 ament_auto_find_build_dependencies()
 
-rosidl_generate_interfaces(lidar_graph_slam_msgs
+rosidl_generate_interfaces(${RROJECT_NAME}
   "msg/KeyFrame.msg"
   "msg/KeyFrameArray.msg"
   DEPENDENCIES builtin_interfaces std_msgs geometry_msgs sensor_msgs
