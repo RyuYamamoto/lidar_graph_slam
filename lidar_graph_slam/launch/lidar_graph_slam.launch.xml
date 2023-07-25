@@ -1,5 +1,6 @@
 <launch>
   <arg name="rviz_config" default="$(find-pkg-share lidar_graph_slam)/rviz/rviz.config"/>
+
   <arg name="rviz" default="true"/>
   <arg name="viewer" default="false"/>
 
