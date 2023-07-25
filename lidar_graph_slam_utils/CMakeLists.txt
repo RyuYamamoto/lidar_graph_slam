@@ -13,8 +13,8 @@ endif()
 find_package(ament_cmake_auto REQUIRED)
 ament_auto_find_build_dependencies()
 
-ament_auto_add_library(${RROJECT_NAME} SHARED
-  src/${RROJECT_NAME}.cpp
+ament_auto_add_library(${PROJECT_NAME} SHARED
+  src/${PROJECT_NAME}.cpp
 )
 
 if(BUILD_TESTING)

@@ -48,8 +48,8 @@ public:
     pcl::PointCloud<PointType>::Ptr dist_filter_points(new pcl::PointCloud<PointType>);
     distance_filter(input_points, dist_filter_points);
 
-    pcl::PointCloud<PointType>::Ptr crop_points(new pcl::PointCloud<PointType>);
-    crop(dist_filter_points, crop_points);
+    //pcl::PointCloud<PointType>::Ptr crop_points(new pcl::PointCloud<PointType>);
+    //crop(dist_filter_points, crop_points);
 
     pcl::PointCloud<PointType>::Ptr voxel_filter_points(new pcl::PointCloud<PointType>);
     downsample(dist_filter_points, voxel_filter_points);

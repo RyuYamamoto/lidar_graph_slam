@@ -1,16 +1,16 @@
 <launch>
-  <arg name="leaf_size" default="0.5"/>
+  <arg name="leaf_size" default="0.1"/>
   <arg name="random_sample_num" default="1500.0"/>
   <arg name="mean_k" default="30"/>
   <arg name="stddev" default="1.2"/>
-  <arg name="min_x" default="-70.0"/>
-  <arg name="max_x" default="70.0"/>
-  <arg name="min_y" default="-70.0"/>
-  <arg name="max_y" default="70.0"/>
-  <arg name="min_z" default="-70.0"/>
-  <arg name="max_z" default="70.0"/>
+  <arg name="min_x" default="-100.0"/>
+  <arg name="max_x" default="100.0"/>
+  <arg name="min_y" default="-100.0"/>
+  <arg name="max_y" default="100.0"/>
+  <arg name="min_z" default="-100.0"/>
+  <arg name="max_z" default="100.0"/>
   <arg name="min_distance_cloud" default="1.0"/>
-  <arg name="max_distance_cloud" default="100.0"/>
+  <arg name="max_distance_cloud" default="200.0"/>
 
   <node pkg="points_prefiltering" exec="points_prefiltering_node" name="points_prefiltering_node" output="screen">
     <remap from="points_raw" to="velodyne_points"/>

@@ -17,16 +17,16 @@ ament_auto_find_build_dependencies()
 
 include_directories(include ${PCL_INCLUDE_DIRS} ${GTSAM_INCLUDE_DIR})
 
-ament_auto_add_library(${RROJECT_NAME} SHARED
-  src/graph_based_slam.cpp
+ament_auto_add_library(${PROJECT_NAME} SHARED
+  src/${PROJECT_NAME}.cpp
 )
 
-rclcpp_components_register_node(${RROJECT_NAME}
+rclcpp_components_register_node(${PROJECT_NAME}
   PLUGIN "GraphBasedSLAM"
-  EXECUTABLE ${RROJECT_NAME}_node
+  EXECUTABLE ${PROJECT_NAME}_node
 )
 
-target_link_libraries(${RROJECT_NAME} ${PCL_LIBRARIES} ${GTSAM_LIBRARY_DIRS} gtsam)
+target_link_libraries(${PROJECT_NAME} ${PCL_LIBRARIES} ${GTSAM_LIBRARY_DIRS} gtsam)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
