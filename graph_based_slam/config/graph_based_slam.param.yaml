@@ -3,10 +3,10 @@
     rate: 1.0
     search_key_frame_num: 20
     search_radius: 50.0
-    score_threshold: 0.7
-    search_for_candidate_threshold: 20.0
+    score_threshold: 0.3
+    search_for_candidate_threshold: 15.0
     accumulate_distance_threshold: 100.0
-    registration_method: "NDT_OMP"
+    registration_method: "ICP"
 
     # Common Settings for Scan Matching
     max_iteration: 100

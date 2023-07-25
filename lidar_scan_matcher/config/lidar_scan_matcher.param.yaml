@@ -17,3 +17,10 @@
     # FAST_GICP
     max_correspondence_distance: 2.0
     correspondence_randomness: 20
+
+    # GICP
+    correspondence_distance: 5.0
+    euclidean_fitness_epsilon: 1e-08
+    correspondence_randomness: 20
+    max_optimizer_iteration: 20
+    use_reciprocal_correspondences: false

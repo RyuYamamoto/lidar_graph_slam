@@ -44,10 +44,34 @@ LidarScanMatcher::LidarScanMatcher(const rclcpp::NodeOptions & node_options)
     ndt_omp->setStepSize(step_size);
     ndt_omp->setResolution(ndt_resolution);
     ndt_omp->setMaximumIterations(max_iteration);
-    ndt_omp->setNeighborhoodSearchMethod(pclomp::KDTREE);
+    ndt_omp->setNeighborhoodSearchMethod(pclomp::DIRECT7);
     if (0 < omp_num_thread) ndt_omp->setNumThreads(omp_num_thread);
 
     registration_ = ndt_omp;
+  } else if (registration_method == "GICP") {
+    pclomp::GeneralizedIterativeClosestPoint<PointType, PointType>::Ptr gicp(
+      new pclomp::GeneralizedIterativeClosestPoint<PointType, PointType>());
+
+    const double correspondence_distance =
+      this->declare_parameter<double>("correspondence_distance");
+    const double max_iteration = this->declare_parameter<int>("max_iteration");
+    const double transformation_epsilon = this->declare_parameter<double>("transformation_epsilon");
+    const double euclidean_fitness_epsilon =
+      this->declare_parameter<double>("euclidean_fitness_epsilon");
+    const int max_optimizer_iteration = this->declare_parameter<int>("max_optimizer_iteration");
+    const bool use_reciprocal_correspondences =
+      this->declare_parameter<bool>("use_reciprocal_correspondences");
+    const int correspondence_randomness = this->declare_parameter<int>("correspondence_randomness");
+
+    gicp->setMaxCorrespondenceDistance(correspondence_distance);
+    gicp->setMaximumIterations(max_iteration);
+    gicp->setUseReciprocalCorrespondences(use_reciprocal_correspondences);
+    gicp->setMaximumOptimizerIterations(max_optimizer_iteration);
+    gicp->setTransformationEpsilon(transformation_epsilon);
+    gicp->setEuclideanFitnessEpsilon(euclidean_fitness_epsilon);
+    gicp->setCorrespondenceRandomness(correspondence_randomness);
+
+    registration_ = gicp;
   }
 
   broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
@@ -68,9 +92,9 @@ LidarScanMatcher::LidarScanMatcher(const rclcpp::NodeOptions & node_options)
     this->create_publisher<lidar_graph_slam_msgs::msg::KeyFrame>("key_frame", 5);
 }
 
-void LidarScanMatcher::correct_imu(const sensor_msgs::msg::Imu imu_msg, const Eigen::Matrix4f &initial_guess)
+void LidarScanMatcher::correct_imu(
+  const sensor_msgs::msg::Imu imu_msg, const Eigen::Matrix4f & initial_guess)
 {
-
 }
 
 void LidarScanMatcher::callback_cloud(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
