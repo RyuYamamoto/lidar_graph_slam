@@ -6,10 +6,8 @@
 ![overview](doc/system_overview.png)
 
 ## 1. Install
-### 1.1 Build Iridescence
-See [Iridescence](https://github.com/koide3/iridescence) and try to install.
 
-### 1.2 Build lidar_graph_slam
+### Build lidar_graph_slam
 
 ```bash
 mkdir -p ~/ros2_ws/src
