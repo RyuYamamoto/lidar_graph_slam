@@ -2,7 +2,6 @@
   <arg name="rviz_config" default="$(find-pkg-share lidar_graph_slam)/rviz/rviz.config"/>
 
   <arg name="rviz" default="true"/>
-  <arg name="viewer" default="false"/>
 
   <include file="$(find-pkg-share points_prefiltering)/launch/points_prefiltering.launch.xml"/>
 
@@ -13,7 +12,4 @@
   <group if="$(var rviz)">
     <node pkg="rviz2" exec="rviz2" name="rviz2" args="-d $(var rviz_config)"/>
 	</group>
-  <group if="$(var viewer)">
-    <include file="$(find-pkg-share lidar_graph_slam_viewer)/launch/viewer.launch.xml"/>
-  </group>
 </launch>
