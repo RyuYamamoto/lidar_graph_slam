@@ -16,6 +16,7 @@ ament_auto_find_build_dependencies()
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/KeyFrame.msg"
   "msg/KeyFrameArray.msg"
+  "srv/SaveMap.srv"
   DEPENDENCIES builtin_interfaces std_msgs geometry_msgs sensor_msgs
 )
 

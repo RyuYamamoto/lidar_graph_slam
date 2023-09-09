@@ -45,6 +45,11 @@ GraphBasedSLAM::GraphBasedSLAM(const rclcpp::NodeOptions & node_options)
   modified_map_publisher_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
     "modified_map", rclcpp::QoS{1}.transient_local());
 
+  save_map_service_ = this->create_service<lidar_graph_slam_msgs::srv::SaveMap>(
+    "save_map",
+    std::bind(
+      &GraphBasedSLAM::save_map_service, this, std::placeholders::_1, std::placeholders::_2));
+
   kd_tree_.reset(new pcl::KdTreeFLANN<PointType>());
   key_frame_point_.reset(new pcl::PointCloud<PointType>);
 
@@ -459,6 +464,40 @@ void GraphBasedSLAM::publish_map()
   map_msg.header.frame_id = "map";
   map_msg.header.stamp = now();
   modified_map_publisher_->publish(map_msg);
+}
+
+bool GraphBasedSLAM::save_map_service(
+  const lidar_graph_slam_msgs::srv::SaveMap::Request::SharedPtr req,
+  lidar_graph_slam_msgs::srv::SaveMap::Response::SharedPtr res)
+{
+  pcl::PointCloud<PointType>::Ptr map(new pcl::PointCloud<PointType>);
+  for (std::size_t idx = 0; idx < key_frame_array_.keyframes.size(); idx++) {
+    pcl::PointCloud<PointType>::Ptr key_frame_cloud(new pcl::PointCloud<PointType>);
+    pcl::fromROSMsg(key_frame_array_.keyframes[idx].cloud, *key_frame_cloud);
+
+    pcl::PointCloud<PointType>::Ptr transformed_cloud(new pcl::PointCloud<PointType>);
+    const Eigen::Matrix4f matrix = geometry_pose_to_matrix(key_frame_array_.keyframes[idx].pose);
+    transformed_cloud = transform_point_cloud(key_frame_cloud, matrix);
+
+    *map += *transformed_cloud;
+  }
+
+  pcl::PointCloud<PointType>::Ptr map_cloud(new pcl::PointCloud<PointType>);
+
+  if (req->resolution <= 0.0) {
+    map_cloud = map;
+  } else {
+    pcl::VoxelGrid<PointType> voxel_grid_filter;
+    voxel_grid_filter.setLeafSize(req->resolution, req->resolution, req->resolution);
+    voxel_grid_filter.setInputCloud(map);
+    voxel_grid_filter.filter(*map_cloud);
+  }
+
+  map_cloud->header.frame_id = "map";
+  int ret = pcl::io::savePCDFile(req->path, *map_cloud);
+  res->ret = (ret == 0);
+
+  return true;
 }
 
 #include "rclcpp_components/register_node_macro.hpp"

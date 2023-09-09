@@ -30,6 +30,7 @@
 
 #include "lidar_graph_slam_msgs/msg/key_frame.hpp"
 #include "lidar_graph_slam_msgs/msg/key_frame_array.hpp"
+#include "lidar_graph_slam_msgs/srv/save_map.hpp"
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <nav_msgs/msg/path.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
@@ -86,6 +87,10 @@ public:
   pcl::Registration<PointType, PointType>::Ptr get_registration(
     const std::string registration_method);
 
+  bool save_map_service(
+    const lidar_graph_slam_msgs::srv::SaveMap::Request::SharedPtr req,
+    lidar_graph_slam_msgs::srv::SaveMap::Response::SharedPtr res);
+
 private:
   rclcpp::Subscription<lidar_graph_slam_msgs::msg::KeyFrame>::SharedPtr key_frame_subscriber_;
 
@@ -96,6 +101,8 @@ private:
   rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr candidate_key_frame_publisher_;
 
   rclcpp::TimerBase::SharedPtr timer_;
+
+  rclcpp::Service<lidar_graph_slam_msgs::srv::SaveMap>::SharedPtr save_map_service_;
 
   // registration
   pcl::Registration<PointType, PointType>::Ptr registration_;
