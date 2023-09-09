@@ -22,12 +22,17 @@ colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
 ```bash
 ros2 launch lidar_graph_slam lidar_graph_slam.launch.xml
 ```
+## 3. save map
+```bash
+ros2 service call /save_map lidar_graph_slam_msgs/srv/SaveMap "{resolution: 0.2, path: "<MAP PATH>"}"
+
+```
 
 [![](https://img.youtube.com/vi/hhWxuyCu7Us/0.jpg)](https://www.youtube.com/watch?v=hhWxuyCu7Us)
 
 ## ToDo
 - [x] graph based SLAM(loop detect)
-- [ ] save map
+- [x] save map
 - [ ] improve loop detection
 - [ ] implement other lidar odometry algorithm
 - [ ] use FPFH
