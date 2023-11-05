@@ -21,6 +21,7 @@
   <depend>visualization_msgs</depend>
   <depend>ndt_omp</depend>
   <depend>fast_gicp</depend>
+  <depend>kiss_icp</depend>
   <depend>lidar_graph_slam_utils</depend>
   <depend>lidar_graph_slam_msgs</depend>
 

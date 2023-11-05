@@ -4,3 +4,6 @@
 [submodule "thirdparty/fast_gicp"]
 	path = thirdparty/fast_gicp
 	url = git@github.com:RyuYamamoto/fast_gicp
+[submodule "thirdparty/kiss-icp"]
+	path = thirdparty/kiss-icp
+	url = git@github.com:PRBonn/kiss-icp.git

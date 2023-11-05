@@ -5,7 +5,8 @@
 
   <include file="$(find-pkg-share points_prefiltering)/launch/points_prefiltering.launch.xml"/>
 
-  <include file="$(find-pkg-share lidar_scan_matcher)/launch/lidar_scan_matcher.launch.xml"/>
+  <!--include file="$(find-pkg-share lidar_scan_matcher)/launch/lidar_scan_matcher.launch.xml"/-->
+  <include file="$(find-pkg-share lidar_scan_matcher)/launch/kiss_icp_matcher.launch.xml"/>
 
   <include file="$(find-pkg-share graph_based_slam)/launch/graph_based_slam.launch.xml"/>
 
