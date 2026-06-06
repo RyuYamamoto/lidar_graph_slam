@@ -97,6 +97,9 @@ public:
         output_points_ptr->points.emplace_back(point);
       }
     }
+    output_points_ptr->width = output_points_ptr->points.size();
+    output_points_ptr->height = 1;
+    output_points_ptr->is_dense = false;
   }
 
   void distance_filter(
@@ -105,10 +108,13 @@ public:
   {
     for (const auto & point : input_points_ptr->points) {
       const double distance = point.getVector3fMap().norm();
-      if (min_distance_cloud_ < distance) {
+      if (min_distance_cloud_ < distance and distance < max_distance_cloud_) {
         output_points_ptr->points.emplace_back(point);
       }
     }
+    output_points_ptr->width = output_points_ptr->points.size();
+    output_points_ptr->height = 1;
+    output_points_ptr->is_dense = false;
   }
 
   void downsample(

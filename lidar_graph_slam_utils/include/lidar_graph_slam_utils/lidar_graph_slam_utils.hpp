@@ -39,7 +39,7 @@
 namespace lidar_graph_slam_utils
 {
 
-Eigen::Matrix4f geometry_pose_to_matrix(const geometry_msgs::msg::Pose pose)
+inline Eigen::Matrix4f geometry_pose_to_matrix(const geometry_msgs::msg::Pose & pose)
 {
   Eigen::Affine3d affine;
   tf2::fromMsg(pose, affine);
@@ -47,7 +47,7 @@ Eigen::Matrix4f geometry_pose_to_matrix(const geometry_msgs::msg::Pose pose)
   return matrix;
 }
 
-gtsam::Pose3 geometry_pose_to_gtsam_pose(const geometry_msgs::msg::Pose pose)
+inline gtsam::Pose3 geometry_pose_to_gtsam_pose(const geometry_msgs::msg::Pose & pose)
 {
   gtsam::Pose3 gtsam_pose = gtsam::Pose3(
     gtsam::Quaternion(
@@ -56,7 +56,7 @@ gtsam::Pose3 geometry_pose_to_gtsam_pose(const geometry_msgs::msg::Pose pose)
   return gtsam_pose;
 }
 
-geometry_msgs::msg::Pose gtsam_pose_to_geometry_pose(const gtsam::Pose3 gtsam_pose)
+inline geometry_msgs::msg::Pose gtsam_pose_to_geometry_pose(const gtsam::Pose3 & gtsam_pose)
 {
   geometry_msgs::msg::Pose pose;
   pose.position.x = gtsam_pose.x();
@@ -71,8 +71,8 @@ geometry_msgs::msg::Pose gtsam_pose_to_geometry_pose(const gtsam::Pose3 gtsam_po
   return pose;
 }
 
-geometry_msgs::msg::Vector3 convert_quaternion_to_euler(
-  const geometry_msgs::msg::Quaternion quaternion)
+inline geometry_msgs::msg::Vector3 convert_quaternion_to_euler(
+  const geometry_msgs::msg::Quaternion & quaternion)
 {
   geometry_msgs::msg::Vector3 euler;
 
@@ -83,8 +83,8 @@ geometry_msgs::msg::Vector3 convert_quaternion_to_euler(
   return euler;
 }
 
-geometry_msgs::msg::Pose convert_transform_to_pose(
-  const geometry_msgs::msg::TransformStamped transform_stamped)
+inline geometry_msgs::msg::Pose convert_transform_to_pose(
+  const geometry_msgs::msg::TransformStamped & transform_stamped)
 {
   geometry_msgs::msg::Pose pose;
   pose.position.x = transform_stamped.transform.translation.x;
@@ -97,7 +97,7 @@ geometry_msgs::msg::Pose convert_transform_to_pose(
   return pose;
 }
 
-Eigen::Matrix4f convert_pose_to_matrix(const geometry_msgs::msg::Pose pose)
+inline Eigen::Matrix4f convert_pose_to_matrix(const geometry_msgs::msg::Pose & pose)
 {
   Eigen::Affine3d affine;
   tf2::fromMsg(pose, affine);
@@ -105,7 +105,7 @@ Eigen::Matrix4f convert_pose_to_matrix(const geometry_msgs::msg::Pose pose)
   return matrix;
 }
 
-geometry_msgs::msg::Pose convert_matrix_to_pose(const Eigen::Matrix4f matrix)
+inline geometry_msgs::msg::Pose convert_matrix_to_pose(const Eigen::Matrix4f & matrix)
 {
   geometry_msgs::msg::Pose pose;
 
@@ -118,13 +118,13 @@ geometry_msgs::msg::Pose convert_matrix_to_pose(const Eigen::Matrix4f matrix)
   return pose;
 }
 
-Eigen::Matrix4f convert_transform_to_matrix(
-  const geometry_msgs::msg::TransformStamped transform_stamped)
+inline Eigen::Matrix4f convert_transform_to_matrix(
+  const geometry_msgs::msg::TransformStamped & transform_stamped)
 {
   return convert_pose_to_matrix(convert_transform_to_pose(transform_stamped));
 }
 
-geometry_msgs::msg::Vector3 create_scale(const double x, const double y, const double z)
+inline geometry_msgs::msg::Vector3 create_scale(const double x, const double y, const double z)
 {
   geometry_msgs::msg::Vector3 vector3;
   vector3.x = x;
@@ -133,7 +133,7 @@ geometry_msgs::msg::Vector3 create_scale(const double x, const double y, const d
   return vector3;
 }
 
-std_msgs::msg::ColorRGBA create_color(
+inline std_msgs::msg::ColorRGBA create_color(
   const double a, const double r, const double g, const double b)
 {
   std_msgs::msg::ColorRGBA color;
@@ -144,9 +144,10 @@ std_msgs::msg::ColorRGBA create_color(
   return color;
 }
 
-visualization_msgs::msg::Marker create_marker(
-  const geometry_msgs::msg::Pose pose, const rclcpp::Time stamp, const int32_t type, const int id,
-  const std::string text, geometry_msgs::msg::Vector3 scale, std_msgs::msg::ColorRGBA color)
+inline visualization_msgs::msg::Marker create_marker(
+  const geometry_msgs::msg::Pose & pose, const rclcpp::Time stamp, const int32_t type, const int id,
+  const std::string & text, const geometry_msgs::msg::Vector3 & scale,
+  const std_msgs::msg::ColorRGBA & color)
 {
   visualization_msgs::msg::Marker marker;
 
