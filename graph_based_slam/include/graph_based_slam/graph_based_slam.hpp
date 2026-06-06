@@ -33,6 +33,7 @@
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <nav_msgs/msg/path.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
+#include <visualization_msgs/msg/marker_array.hpp>
 
 #include <gtsam/geometry/Pose3.h>
 #include <gtsam/geometry/Rot3.h>
@@ -100,6 +101,7 @@ private:
   rclcpp::Publisher<lidar_graph_slam_msgs::msg::KeyFrameArray>::SharedPtr
     modified_key_frame_publisher_;
   rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr candidate_key_frame_publisher_;
+  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr accepted_loop_publisher_;
 
   rclcpp::TimerBase::SharedPtr timer_;
 
@@ -117,6 +119,7 @@ private:
   std::shared_ptr<gtsam::ISAM2> optimizer_;
   gtsam::Values initial_estimate_;
   gtsam::noiseModel::Diagonal::shared_ptr prior_noise_;
+  gtsam::noiseModel::Diagonal::shared_ptr odometry_noise_;
 
   pcl::PointCloud<PointType>::Ptr key_frame_point_;
   lidar_graph_slam_msgs::msg::KeyFrameArray key_frame_array_;
@@ -138,6 +141,9 @@ private:
   double accumulate_distance_threshold_;
 
   nav_msgs::msg::Path candidate_line_;
+
+  // accumulated LINE_LIST marker of accepted (added to the graph) loop-closure edges
+  visualization_msgs::msg::Marker accepted_loop_marker_;
 };
 
 #endif

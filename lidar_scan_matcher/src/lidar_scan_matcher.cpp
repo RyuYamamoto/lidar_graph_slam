@@ -144,7 +144,10 @@ void LidarScanMatcher::callback_cloud(const sensor_msgs::msg::PointCloud2::Share
     key_frame.id = id_;
     id_++;
 
-    pcl::toROSMsg(*input_cloud_ptr, key_frame.cloud);
+    // Store the cloud in the base frame, consistent with subsequent key frames below.
+    // (Previously the first key frame stored the raw sensor-frame cloud, offsetting it by the
+    // base->sensor extrinsic when the map was reconstructed.)
+    pcl::toROSMsg(*base_to_sensor_cloud, key_frame.cloud);
     key_frame_array_.keyframes.emplace_back(key_frame);
 
     *target_cloud_ += *base_to_sensor_cloud;
