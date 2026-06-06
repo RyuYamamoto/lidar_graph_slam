@@ -69,7 +69,7 @@ GraphBasedSLAM::GraphBasedSLAM(const rclcpp::NodeOptions & node_options)
   prior_noise_ = gtsam::noiseModel::Diagonal::Variances(Vector6);
 
   const double rate = declare_parameter<double>("rate");
-  timer_ = create_timer(
+  timer_ = rclcpp::create_timer(
     this, get_clock(), rclcpp::Rate(rate).period(),
     std::bind(&GraphBasedSLAM::optimization_callback, this));
 }
