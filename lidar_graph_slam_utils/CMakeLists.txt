@@ -13,9 +13,16 @@ endif()
 find_package(ament_cmake_auto REQUIRED)
 ament_auto_find_build_dependencies()
 
+# GTSAM exports an imported target (gtsam) and GTSAM_INCLUDE_DIR rather than the
+# ament-style gtsam_INCLUDE_DIRS/gtsam_LIBRARIES variables, so ament_cmake_auto
+# does not propagate its include paths automatically. Link the target explicitly.
+find_package(GTSAM REQUIRED)
+
 ament_auto_add_library(${PROJECT_NAME} SHARED
   src/${PROJECT_NAME}.cpp
 )
+
+target_link_libraries(${PROJECT_NAME} gtsam)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
