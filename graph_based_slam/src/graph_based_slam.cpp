@@ -52,6 +52,7 @@ GraphBasedSLAM::GraphBasedSLAM(const rclcpp::NodeOptions & node_options)
 
   kd_tree_.reset(new pcl::KdTreeFLANN<PointType>());
   key_frame_point_.reset(new pcl::PointCloud<PointType>);
+  map_.reset(new pcl::PointCloud<PointType>);
 
   gtsam::ISAM2Params parameters;
   parameters.relinearizeThreshold = 0.1;
@@ -75,7 +76,7 @@ GraphBasedSLAM::GraphBasedSLAM(const rclcpp::NodeOptions & node_options)
 }
 
 pcl::Registration<PointType, PointType>::Ptr GraphBasedSLAM::get_registration(
-  const std::string registration_method)
+  const std::string & registration_method)
 {
   pcl::Registration<PointType, PointType>::Ptr registration;
 
@@ -155,8 +156,8 @@ pcl::Registration<PointType, PointType>::Ptr GraphBasedSLAM::get_registration(
 }
 
 bool GraphBasedSLAM::detect_loop_with_accum_dist(
-  const lidar_graph_slam_msgs::msg::KeyFrame latest_key_frame,
-  const lidar_graph_slam_msgs::msg::KeyFrameArray key_frame_array,
+  const lidar_graph_slam_msgs::msg::KeyFrame & latest_key_frame,
+  const lidar_graph_slam_msgs::msg::KeyFrameArray & key_frame_array,
   std::vector<lidar_graph_slam_msgs::msg::KeyFrame> & candidate_key_frame)
 {
   const rclcpp::Time latest_stamp = latest_key_frame.header.stamp;
@@ -165,9 +166,7 @@ bool GraphBasedSLAM::detect_loop_with_accum_dist(
     latest_key_frame.pose.position.z};
   const double latest_accum_dist = latest_key_frame.accum_distance;
 
-  const int key_frame_size = key_frame_array.keyframes.size();
-
-  for (auto key_frame : key_frame_array.keyframes) {
+  for (const auto & key_frame : key_frame_array.keyframes) {
     if ((latest_accum_dist - key_frame.accum_distance) < accumulate_distance_threshold_) {
       continue;
     }
@@ -187,8 +186,7 @@ bool GraphBasedSLAM::detect_loop_with_accum_dist(
 }
 
 bool GraphBasedSLAM::detect_loop_with_kd_tree(
-  const lidar_graph_slam_msgs::msg::KeyFrame latest_key_frame,
-  // const lidar_graph_slam_msgs::msg::KeyFrameArray key_frame_array,
+  const lidar_graph_slam_msgs::msg::KeyFrame & latest_key_frame,
   const pcl::PointCloud<PointType>::Ptr key_frame_cloud,
   pcl::PointCloud<PointType>::Ptr & nearest_key_frame_cloud, int & closest_key_frame_id)
 {
@@ -237,9 +235,9 @@ bool GraphBasedSLAM::detect_loop_with_kd_tree(
 
 void GraphBasedSLAM::optimization_callback()
 {
-  if (key_frame_array_.keyframes.empty()) return;
+  std::lock_guard<std::mutex> lock(graph_mutex_);
 
-  std::lock_guard<std::mutex> lock(optimize_thread_mutex_);
+  if (key_frame_array_.keyframes.empty()) return;
 
   const int key_frame_size = key_frame_array_.keyframes.size();
   const auto latest_key_frame = key_frame_array_.keyframes.back();
@@ -288,6 +286,7 @@ void GraphBasedSLAM::optimization_callback()
     geometry_msgs::msg::PoseStamped pose_from;
     pose_from.pose = key_frame_array_.keyframes[min_id].pose;
     pose_from.header = key_frame_array_.keyframes[min_id].header;
+    candidate_line_.poses.clear();
     candidate_line_.poses.emplace_back(pose_from);
     candidate_line_.poses.emplace_back(pose_to);
     candidate_line_.header.frame_id = "map";
@@ -353,7 +352,7 @@ void GraphBasedSLAM::optimization_callback()
 
 void GraphBasedSLAM::key_frame_callback(const lidar_graph_slam_msgs::msg::KeyFrame::SharedPtr msg)
 {
-  std::lock_guard<std::mutex> lock(key_frame_update_mutex_);
+  std::lock_guard<std::mutex> lock(graph_mutex_);
   if (!is_initialized_key_frame_) is_initialized_key_frame_ = true;
 
   auto key_frame_size = key_frame_array_.keyframes.size();
@@ -397,8 +396,13 @@ void GraphBasedSLAM::key_frame_callback(const lidar_graph_slam_msgs::msg::KeyFra
   key_frame_raw_array_.keyframes.emplace_back(*msg);
 
   if (is_loop_closed_) {
+    // loop closure shifts every key frame pose, so the cached map must be rebuilt from scratch.
     adjust_pose();
+    rebuild_map();
     is_loop_closed_ = false;
+  } else {
+    // no loop closure: only the newest key frame is new, so append it incrementally (O(1)).
+    append_key_frame_to_map(key_frame);
   }
 
   publish_map();
@@ -406,7 +410,7 @@ void GraphBasedSLAM::key_frame_callback(const lidar_graph_slam_msgs::msg::KeyFra
 }
 
 pcl::PointCloud<PointType>::Ptr GraphBasedSLAM::transform_point_cloud(
-  const pcl::PointCloud<PointType>::Ptr input_cloud_ptr, const Eigen::Matrix4f transform_matrix)
+  const pcl::PointCloud<PointType>::Ptr input_cloud_ptr, const Eigen::Matrix4f & transform_matrix)
 {
   pcl::PointCloud<PointType>::Ptr transform_cloud_ptr(new pcl::PointCloud<PointType>);
   pcl::transformPointCloud(*input_cloud_ptr, *transform_cloud_ptr, transform_matrix);
@@ -445,22 +449,28 @@ void GraphBasedSLAM::update_estimate_path()
   modified_path_publisher_->publish(path);
 }
 
+void GraphBasedSLAM::append_key_frame_to_map(
+  const lidar_graph_slam_msgs::msg::KeyFrame & key_frame)
+{
+  pcl::PointCloud<PointType>::Ptr key_frame_cloud(new pcl::PointCloud<PointType>);
+  pcl::fromROSMsg(key_frame.cloud, *key_frame_cloud);
+
+  const Eigen::Matrix4f matrix = geometry_pose_to_matrix(key_frame.pose);
+  *map_ += *transform_point_cloud(key_frame_cloud, matrix);
+}
+
+void GraphBasedSLAM::rebuild_map()
+{
+  map_->clear();
+  for (const auto & key_frame : key_frame_array_.keyframes) {
+    append_key_frame_to_map(key_frame);
+  }
+}
+
 void GraphBasedSLAM::publish_map()
 {
-  pcl::PointCloud<PointType>::Ptr map(new pcl::PointCloud<PointType>);
-  for (std::size_t idx = 0; idx < key_frame_array_.keyframes.size(); idx++) {
-    pcl::PointCloud<PointType>::Ptr key_frame_cloud(new pcl::PointCloud<PointType>);
-    pcl::fromROSMsg(key_frame_array_.keyframes[idx].cloud, *key_frame_cloud);
-
-    pcl::PointCloud<PointType>::Ptr transformed_cloud(new pcl::PointCloud<PointType>);
-    const Eigen::Matrix4f matrix = geometry_pose_to_matrix(key_frame_array_.keyframes[idx].pose);
-    transformed_cloud = transform_point_cloud(key_frame_cloud, matrix);
-
-    *map += *transformed_cloud;
-  }
-
   sensor_msgs::msg::PointCloud2 map_msg;
-  pcl::toROSMsg(*map, map_msg);
+  pcl::toROSMsg(*map_, map_msg);
   map_msg.header.frame_id = "map";
   map_msg.header.stamp = now();
   modified_map_publisher_->publish(map_msg);

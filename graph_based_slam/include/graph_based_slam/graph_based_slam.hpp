@@ -24,7 +24,6 @@
 #define LIDAR_GRAPH_SLAM__GRAPH_BASED_SLAM_HPP_
 
 #include <fast_gicp/gicp/fast_gicp.hpp>
-#include <lidar_graph_slam_utils/lib/kd_tree.hpp>
 #include <lidar_graph_slam_utils/lidar_graph_slam_utils.hpp>
 #include <rclcpp/rclcpp.hpp>
 
@@ -63,12 +62,12 @@ public:
   ~GraphBasedSLAM() = default;
 
   bool detect_loop_with_accum_dist(
-    const lidar_graph_slam_msgs::msg::KeyFrame latest_key_frame,
-    const lidar_graph_slam_msgs::msg::KeyFrameArray key_frame_array,
+    const lidar_graph_slam_msgs::msg::KeyFrame & latest_key_frame,
+    const lidar_graph_slam_msgs::msg::KeyFrameArray & key_frame_array,
     std::vector<lidar_graph_slam_msgs::msg::KeyFrame> & candidate_key_frame);
 
   bool detect_loop_with_kd_tree(
-    const lidar_graph_slam_msgs::msg::KeyFrame latest_key_frame,
+    const lidar_graph_slam_msgs::msg::KeyFrame & latest_key_frame,
     const pcl::PointCloud<PointType>::Ptr key_frame_cloud,
     pcl::PointCloud<PointType>::Ptr & nearest_key_frame_cloud, int & closest_key_frame_id);
 
@@ -80,12 +79,14 @@ public:
   void update_estimate_path();
   void publish_candidate();
   void publish_map();
+  void append_key_frame_to_map(const lidar_graph_slam_msgs::msg::KeyFrame & key_frame);
+  void rebuild_map();
 
   pcl::PointCloud<PointType>::Ptr transform_point_cloud(
-    const pcl::PointCloud<PointType>::Ptr input_cloud_ptr, const Eigen::Matrix4f transform_matrix);
+    const pcl::PointCloud<PointType>::Ptr input_cloud_ptr, const Eigen::Matrix4f & transform_matrix);
 
   pcl::Registration<PointType, PointType>::Ptr get_registration(
-    const std::string registration_method);
+    const std::string & registration_method);
 
   bool save_map_service(
     const lidar_graph_slam_msgs::srv::SaveMap::Request::SharedPtr req,
@@ -107,7 +108,6 @@ private:
   // registration
   pcl::Registration<PointType, PointType>::Ptr registration_;
 
-  // std::shared_ptr<KDTree> kd_tree_;
   pcl::KdTreeFLANN<PointType>::Ptr kd_tree_;
 
   // voxel grid filtering
@@ -122,8 +122,12 @@ private:
   lidar_graph_slam_msgs::msg::KeyFrameArray key_frame_array_;
   lidar_graph_slam_msgs::msg::KeyFrameArray key_frame_raw_array_;
 
-  std::mutex optimize_thread_mutex_;
-  std::mutex key_frame_update_mutex_;
+  // accumulated map cache (incrementally appended; fully rebuilt after loop closure)
+  pcl::PointCloud<PointType>::Ptr map_;
+
+  // single mutex guarding all shared SLAM state (graph_, optimizer_, key_frame_array_,
+  // is_loop_closed_). key_frame_callback and optimization_callback must not run concurrently.
+  std::mutex graph_mutex_;
 
   bool is_loop_closed_{false};
   bool is_initialized_key_frame_{false};

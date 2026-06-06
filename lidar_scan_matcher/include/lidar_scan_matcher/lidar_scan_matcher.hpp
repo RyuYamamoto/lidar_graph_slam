@@ -64,24 +64,24 @@ public:
   void callback_imu(const sensor_msgs::msg::Imu::SharedPtr msg);
   void callback_odometry(const nav_msgs::msg::Odometry::SharedPtr msg);
 
-  void correct_imu(const sensor_msgs::msg::Imu imu_msg, const Eigen::Matrix4f & initial_guess);
+  void correct_imu(const sensor_msgs::msg::Imu & imu_msg, const Eigen::Matrix4f & initial_guess);
   void get_latest_imu_msg(sensor_msgs::msg::Imu & latest_imu_msg);
 
   pcl::Registration<PointType, PointType>::Ptr get_registration();
-  nav_msgs::msg::Odometry convert_to_odometry(const geometry_msgs::msg::Pose pose);
+  nav_msgs::msg::Odometry convert_to_odometry(const geometry_msgs::msg::Pose & pose);
 
   geometry_msgs::msg::TransformStamped get_transform(
-    const std::string source_frame, const std::string target_frame);
+    const std::string & source_frame, const std::string & target_frame);
   pcl::PointCloud<PointType>::Ptr transform_point_cloud(
     const pcl::PointCloud<PointType>::Ptr input_cloud_ptr,
-    const geometry_msgs::msg::TransformStamped transform);
+    const geometry_msgs::msg::TransformStamped & transform);
   pcl::PointCloud<PointType>::Ptr transform_point_cloud(
-    const pcl::PointCloud<PointType>::Ptr input_cloud_ptr, const Eigen::Matrix4f transform_matrix);
+    const pcl::PointCloud<PointType>::Ptr input_cloud_ptr, const Eigen::Matrix4f & transform_matrix);
 
   void publish_tf(
-    const geometry_msgs::msg::Pose pose, const rclcpp::Time stamp, const std::string frame_id,
-    const std::string child_frame_id);
-  void publish_key_frame(const lidar_graph_slam_msgs::msg::KeyFrame key_frame);
+    const geometry_msgs::msg::Pose & pose, const rclcpp::Time stamp, const std::string & frame_id,
+    const std::string & child_frame_id);
+  void publish_key_frame(const lidar_graph_slam_msgs::msg::KeyFrame & key_frame);
 
 private:
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr sensor_points_subscriber_;
