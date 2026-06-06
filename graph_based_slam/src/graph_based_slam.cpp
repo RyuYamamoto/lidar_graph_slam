@@ -40,6 +40,8 @@ GraphBasedSLAM::GraphBasedSLAM(const rclcpp::NodeOptions & node_options)
   modified_path_publisher_ = this->create_publisher<nav_msgs::msg::Path>("modified_path", 5);
   candidate_key_frame_publisher_ =
     this->create_publisher<nav_msgs::msg::Path>("candidate_key_frame", 5);
+  accepted_loop_publisher_ = this->create_publisher<visualization_msgs::msg::MarkerArray>(
+    "accepted_loop_edges", rclcpp::QoS{1}.transient_local());
   modified_key_frame_publisher_ =
     this->create_publisher<lidar_graph_slam_msgs::msg::KeyFrameArray>("modified_key_frame", 5);
   modified_map_publisher_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
@@ -65,9 +67,32 @@ GraphBasedSLAM::GraphBasedSLAM(const rclcpp::NodeOptions & node_options)
     this->declare_parameter<std::string>("registration_method");
   registration_ = get_registration(registration_method);
 
-  gtsam::Vector Vector6(6);
-  Vector6 << 1e-6, 1e-6, 1e-6, 1e-8, 1e-8, 1e-6;
-  prior_noise_ = gtsam::noiseModel::Diagonal::Variances(Vector6);
+  // NOTE: gtsam::Pose3 tangent ordering is [rx, ry, rz, x, y, z] (rotation first).
+  // Prior: tightly anchor the first key frame to fix the gauge freedom.
+  gtsam::Vector prior_variance(6);
+  prior_variance << 1e-6, 1e-6, 1e-6, 1e-8, 1e-8, 1e-8;
+  prior_noise_ = gtsam::noiseModel::Diagonal::Variances(prior_variance);
+
+  // Odometry: scan-matching relative motion is good but NOT rigid. Using a moderate
+  // covariance (rot ~0.6deg, trans ~5cm) lets loop-closure constraints redistribute the
+  // accumulated drift. (Previously this reused the ultra-tight prior noise, which made the
+  // odometry chain effectively rigid and caused loop closures to be ignored.)
+  gtsam::Vector odometry_variance(6);
+  odometry_variance << 1e-4, 1e-4, 1e-4, 2.5e-3, 2.5e-3, 2.5e-3;
+  odometry_noise_ = gtsam::noiseModel::Diagonal::Variances(odometry_variance);
+
+  // cyan LINE_LIST marker accumulating every accepted loop-closure edge for RViz debugging.
+  // (cyan keeps it distinct from the green modified_path trajectory.)
+  accepted_loop_marker_.header.frame_id = "map";
+  accepted_loop_marker_.ns = "accepted_loop_edges";
+  accepted_loop_marker_.id = 0;
+  accepted_loop_marker_.type = visualization_msgs::msg::Marker::LINE_LIST;
+  accepted_loop_marker_.action = visualization_msgs::msg::Marker::ADD;
+  accepted_loop_marker_.scale.x = 0.3;
+  accepted_loop_marker_.color.g = 1.0;
+  accepted_loop_marker_.color.b = 1.0;
+  accepted_loop_marker_.color.a = 1.0;
+  accepted_loop_marker_.pose.orientation.w = 1.0;
 
   const double rate = declare_parameter<double>("rate");
   timer_ = rclcpp::create_timer(
@@ -239,6 +264,11 @@ void GraphBasedSLAM::optimization_callback()
 
   if (key_frame_array_.keyframes.empty()) return;
 
+  // Skip new loop detection until the previous closure has been applied by adjust_pose (on the
+  // next key frame). Otherwise the timer keeps re-detecting the same candidate on still-drifted
+  // poses and adds duplicate loop factors, over-constraining that location.
+  if (is_loop_closed_) return;
+
   const int key_frame_size = key_frame_array_.keyframes.size();
   const auto latest_key_frame = key_frame_array_.keyframes.back();
   pcl::PointCloud<PointType>::Ptr nearest_key_frame_cloud(new pcl::PointCloud<PointType>);
@@ -320,26 +350,42 @@ void GraphBasedSLAM::optimization_callback()
   const double fitness_score = registration_->getFitnessScore();
   const bool has_converged = registration_->hasConverged();
 
-  RCLCPP_INFO_STREAM(get_logger(), "fitness score: " << fitness_score);
-  RCLCPP_INFO_STREAM(get_logger(), "min_id: " << min_id);
   candidate_key_frame_publisher_->publish(candidate_line_);
 
-  if (!has_converged or score_threshold_ < fitness_score) return;
+  if (!has_converged or score_threshold_ < fitness_score) {
+    RCLCPP_INFO(
+      get_logger(), "loop candidate REJECTED (latest=%d, min_id=%d): converged=%d, fitness=%.4f (> %.4f)",
+      key_frame_size - 1, min_id, has_converged, fitness_score, score_threshold_);
+    return;
+  }
+  RCLCPP_INFO(
+    get_logger(), "loop candidate ACCEPTED (latest=%d, min_id=%d): fitness=%.4f",
+    key_frame_size - 1, min_id, fitness_score);
 
   // correct position
   auto pose_from = geometry_pose_to_gtsam_pose(
     convert_matrix_to_pose(transform * geometry_pose_to_matrix(latest_key_frame.pose)));
   // candidate position
   auto pose_to = geometry_pose_to_gtsam_pose(key_frame_array_.keyframes[min_id].pose);
-  gtsam::Vector Vector6(6);
-  Vector6 << fitness_score, fitness_score, fitness_score, fitness_score, fitness_score,
-    fitness_score;
+  // Loop-closure noise scaled by the registration fitness score, with rotation and
+  // translation treated separately and clamped to sane floors. Order: [rx, ry, rz, x, y, z].
+  const double loop_translation_variance = std::max(1e-2, fitness_score);
+  const double loop_rotation_variance = std::max(1e-3, fitness_score * 0.1);
+  gtsam::Vector loop_variance(6);
+  loop_variance << loop_rotation_variance, loop_rotation_variance, loop_rotation_variance,
+    loop_translation_variance, loop_translation_variance, loop_translation_variance;
   gtsam::noiseModel::Diagonal::shared_ptr optimize_noise =
-    gtsam::noiseModel::Diagonal::Variances(Vector6);
+    gtsam::noiseModel::Diagonal::Variances(loop_variance);
   graph_.add(gtsam::BetweenFactor<gtsam::Pose3>(
     key_frame_size - 1, min_id, pose_from.between(pose_to), optimize_noise));
 
-  RCLCPP_INFO_STREAM(get_logger(), "optimized...");
+  // visualize the accepted loop edge (latest key frame <-> matched candidate) in cyan.
+  accepted_loop_marker_.points.emplace_back(latest_key_frame.pose.position);
+  accepted_loop_marker_.points.emplace_back(key_frame_array_.keyframes[min_id].pose.position);
+  accepted_loop_marker_.header.stamp = now();
+  visualization_msgs::msg::MarkerArray accepted_loop_markers;
+  accepted_loop_markers.markers.emplace_back(accepted_loop_marker_);
+  accepted_loop_publisher_->publish(accepted_loop_markers);
 
   // update
   optimizer_->update(graph_);
@@ -356,17 +402,21 @@ void GraphBasedSLAM::key_frame_callback(const lidar_graph_slam_msgs::msg::KeyFra
   if (!is_initialized_key_frame_) is_initialized_key_frame_ = true;
 
   auto key_frame_size = key_frame_array_.keyframes.size();
-  auto latest_key_frame = geometry_pose_to_gtsam_pose(msg->pose);
+  // Raw scan-matcher global pose of the current key frame.
+  auto current_raw_pose = geometry_pose_to_gtsam_pose(msg->pose);
   if (key_frame_array_.keyframes.empty()) {
-    gtsam::Vector Vector6(6);
-    graph_.add(gtsam::PriorFactor<gtsam::Pose3>(0, latest_key_frame, prior_noise_));
-    initial_estimate_.insert(0, latest_key_frame);
+    graph_.add(gtsam::PriorFactor<gtsam::Pose3>(0, current_raw_pose, prior_noise_));
+    initial_estimate_.insert(0, current_raw_pose);
   } else {
-    auto previous_key_frame = geometry_pose_to_gtsam_pose(key_frame_array_.keyframes.back().pose);
+    // Odometry edge measurement must be the relative motion between consecutive RAW
+    // scan-matcher poses. Using the optimized previous pose (key_frame_array_) would fold the
+    // loop-closure correction back into the measurement and corrupt the graph after a closure.
+    auto previous_raw_pose =
+      geometry_pose_to_gtsam_pose(key_frame_raw_array_.keyframes.back().pose);
     graph_.add(gtsam::BetweenFactor<gtsam::Pose3>(
-      key_frame_size - 1, key_frame_size, previous_key_frame.between(latest_key_frame),
-      prior_noise_));
-    initial_estimate_.insert(key_frame_size, latest_key_frame);
+      key_frame_size - 1, key_frame_size, previous_raw_pose.between(current_raw_pose),
+      odometry_noise_));
+    initial_estimate_.insert(key_frame_size, current_raw_pose);
   }
 
   optimizer_->update(graph_, initial_estimate_);
@@ -421,11 +471,21 @@ pcl::PointCloud<PointType>::Ptr GraphBasedSLAM::transform_point_cloud(
 void GraphBasedSLAM::adjust_pose()
 {
   auto current_estimate = optimizer_->calculateEstimate();
-  auto estimated_pose = current_estimate.at<gtsam::Pose3>(current_estimate.size() - 1);
+
+  double max_shift = 0.0;
+  double sum_shift = 0.0;
 
   for (std::size_t idx = 0; idx < current_estimate.size(); idx++) {
-    key_frame_array_.keyframes[idx].pose =
-      gtsam_pose_to_geometry_pose(current_estimate.at<gtsam::Pose3>(idx));
+    const auto & previous_position = key_frame_array_.keyframes[idx].pose.position;
+    const gtsam::Pose3 optimized = current_estimate.at<gtsam::Pose3>(idx);
+
+    const double shift = std::hypot(
+      optimized.x() - previous_position.x, optimized.y() - previous_position.y,
+      optimized.z() - previous_position.z);
+    max_shift = std::max(max_shift, shift);
+    sum_shift += shift;
+
+    key_frame_array_.keyframes[idx].pose = gtsam_pose_to_geometry_pose(optimized);
 
     PointType key_frame_point;
     key_frame_point.x = key_frame_array_.keyframes[idx].pose.position.x;
@@ -433,6 +493,13 @@ void GraphBasedSLAM::adjust_pose()
     key_frame_point.z = key_frame_array_.keyframes[idx].pose.position.z;
     key_frame_point_->points[idx] = key_frame_point;
   }
+
+  const double mean_shift = current_estimate.empty()
+                              ? 0.0
+                              : sum_shift / static_cast<double>(current_estimate.size());
+  RCLCPP_INFO(
+    get_logger(), "loop closure correction: max=%.3f m, mean=%.3f m over %zu key frames", max_shift,
+    mean_shift, current_estimate.size());
 }
 
 void GraphBasedSLAM::update_estimate_path()
