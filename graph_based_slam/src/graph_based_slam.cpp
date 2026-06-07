@@ -24,6 +24,15 @@
 
 using namespace lidar_graph_slam_utils;
 
+namespace
+{
+// Heavy messages (full map, full key frame array) are published only every Nth key frame to avoid
+// overflowing the reliable transport (which otherwise closes the connection and stalls all output).
+constexpr int kHeavyPublishInterval = 5;
+// Leaf size [m] for down-sampling the map before publishing it for visualization.
+constexpr float kMapPublishLeafSize = 0.2f;
+}  // namespace
+
 GraphBasedSLAM::GraphBasedSLAM(const rclcpp::NodeOptions & node_options)
 : Node("graph_based_slam", node_options)
 {
@@ -435,7 +444,6 @@ void GraphBasedSLAM::key_frame_callback(const lidar_graph_slam_msgs::msg::KeyFra
   key_frame.accum_distance = msg->accum_distance;
   key_frame.id = msg->id;
   key_frame_array_.keyframes.emplace_back(key_frame);
-  modified_key_frame_publisher_->publish(key_frame_array_);
 
   PointType key_frame_point;
   key_frame_point.x = key_frame.pose.position.x;
@@ -445,18 +453,29 @@ void GraphBasedSLAM::key_frame_callback(const lidar_graph_slam_msgs::msg::KeyFra
 
   key_frame_raw_array_.keyframes.emplace_back(*msg);
 
+  bool loop_applied = false;
   if (is_loop_closed_) {
     // loop closure shifts every key frame pose, so the cached map must be rebuilt from scratch.
     adjust_pose();
     rebuild_map();
     is_loop_closed_ = false;
+    loop_applied = true;
   } else {
     // no loop closure: only the newest key frame is new, so append it incrementally (O(1)).
     append_key_frame_to_map(key_frame);
   }
 
-  publish_map();
-  update_estimate_path();
+  update_estimate_path();  // small message, publish every key frame
+
+  // The full map and full key frame array are large and grow over time; publishing them every key
+  // frame floods the reliable transport. Throttle them, but always publish right after a loop
+  // closure so the corrected map/poses are shown promptly.
+  const bool publish_heavy =
+    loop_applied || (key_frame_array_.keyframes.size() % kHeavyPublishInterval == 0);
+  if (publish_heavy) {
+    publish_map();
+    modified_key_frame_publisher_->publish(key_frame_array_);
+  }
 }
 
 pcl::PointCloud<PointType>::Ptr GraphBasedSLAM::transform_point_cloud(
@@ -536,8 +555,16 @@ void GraphBasedSLAM::rebuild_map()
 
 void GraphBasedSLAM::publish_map()
 {
+  // Down-sample before publishing so the visualization message size stays bounded as the map grows
+  // (the full-resolution map is kept in map_ and used by the save_map service).
+  pcl::PointCloud<PointType>::Ptr downsampled_map(new pcl::PointCloud<PointType>);
+  pcl::VoxelGrid<PointType> voxel_grid_filter;
+  voxel_grid_filter.setLeafSize(kMapPublishLeafSize, kMapPublishLeafSize, kMapPublishLeafSize);
+  voxel_grid_filter.setInputCloud(map_);
+  voxel_grid_filter.filter(*downsampled_map);
+
   sensor_msgs::msg::PointCloud2 map_msg;
-  pcl::toROSMsg(*map_, map_msg);
+  pcl::toROSMsg(*downsampled_map, map_msg);
   map_msg.header.frame_id = "map";
   map_msg.header.stamp = now();
   modified_map_publisher_->publish(map_msg);

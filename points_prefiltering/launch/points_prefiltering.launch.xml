@@ -1,4 +1,5 @@
 <launch>
+  <arg name="use_sim_time" default="false"/>
   <arg name="leaf_size" default="0.1"/>
   <arg name="random_sample_num" default="1500.0"/>
   <arg name="mean_k" default="30"/>
@@ -14,6 +15,7 @@
 
   <node pkg="points_prefiltering" exec="points_prefiltering_node" name="points_prefiltering_node" output="screen">
     <remap from="points_raw" to="velodyne_points"/>
+    <param name="use_sim_time" value="$(var use_sim_time)"/>
     <param name="leaf_size" value="$(var leaf_size)"/>
     <param name="random_sample_num" value="$(var random_sample_num)"/>
     <param name="mean_k" value="$(var mean_k)"/>

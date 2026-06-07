@@ -134,6 +134,7 @@ void LidarScanMatcher::callback_cloud(const sensor_msgs::msg::PointCloud2::Share
 
   if (!target_cloud_) {
     prev_translation_.setIdentity();
+    prev_prev_translation_.setIdentity();
     key_frame_.setIdentity();
     target_cloud_.reset(new pcl::PointCloud<PointType>);
     target_cloud_->header.frame_id = "map";
@@ -166,8 +167,14 @@ void LidarScanMatcher::callback_cloud(const sensor_msgs::msg::PointCloud2::Share
 
   registration_->setInputSource(base_to_sensor_cloud);
 
+  // Constant-velocity motion model: extrapolate the last body-frame increment to predict the
+  // current pose, instead of using the previous pose directly (a zero-velocity assumption). This
+  // gives the registration a far better initial guess when the vehicle is moving.
+  const Eigen::Matrix4f motion_increment = prev_prev_translation_.inverse() * prev_translation_;
+  const Eigen::Matrix4f predicted_translation = prev_translation_ * motion_increment;
+
   pcl::PointCloud<PointType>::Ptr aligned_cloud_ptr(new pcl::PointCloud<PointType>);
-  registration_->align(*aligned_cloud_ptr, prev_translation_);
+  registration_->align(*aligned_cloud_ptr, predicted_translation);
 
   if (!registration_->hasConverged()) {
     RCLCPP_ERROR(get_logger(), "LiDAR Scan Matching has not Converged.");
@@ -175,6 +182,7 @@ void LidarScanMatcher::callback_cloud(const sensor_msgs::msg::PointCloud2::Share
   }
 
   translation_ = registration_->getFinalTransformation();
+  prev_prev_translation_ = prev_translation_;
   prev_translation_ = translation_;
 
   const Eigen::Vector3d current_position = translation_.block<3, 1>(0, 3).cast<double>();

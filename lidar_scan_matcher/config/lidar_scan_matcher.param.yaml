@@ -12,7 +12,7 @@
 
     # NDT_OMP
     step_size: 0.1
-    ndt_resolution: 2.0
+    ndt_resolution: 1.0
 
     # FAST_GICP
     max_correspondence_distance: 2.0

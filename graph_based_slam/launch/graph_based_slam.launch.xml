@@ -1,7 +1,9 @@
 <launch>
   <arg name="graph_based_slam_param_path" default="$(find-pkg-share graph_based_slam)/config/graph_based_slam.param.yaml"/>
+  <arg name="use_sim_time" default="false"/>
 
   <node pkg="graph_based_slam" exec="graph_based_slam_node" name="graph_based_slam_node" output="screen">
     <param from="$(var graph_based_slam_param_path)"/>
+    <param name="use_sim_time" value="$(var use_sim_time)"/>
   </node>
 </launch>
