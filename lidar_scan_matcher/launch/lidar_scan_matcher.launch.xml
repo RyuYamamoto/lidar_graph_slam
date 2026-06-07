@@ -1,9 +1,11 @@
 <launch>
   <arg name="lidar_scan_matcher_param_path" default="$(find-pkg-share lidar_scan_matcher)/config/lidar_scan_matcher.param.yaml"/>
+  <arg name="use_sim_time" default="false"/>
 
   <node pkg="lidar_scan_matcher" exec="lidar_scan_matcher_node" name="lidar_scan_matcher_node" output="screen">
     <remap from="points_raw" to="filtered_points"/>
     <param from="$(var lidar_scan_matcher_param_path)"/>
+    <param name="use_sim_time" value="$(var use_sim_time)"/>
   </node>
 
 </launch>

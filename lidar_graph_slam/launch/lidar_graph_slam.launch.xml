@@ -2,12 +2,19 @@
   <arg name="rviz_config" default="$(find-pkg-share lidar_graph_slam)/rviz/rviz.config"/>
 
   <arg name="rviz" default="true"/>
+  <arg name="use_sim_time" default="false"/>
 
-  <include file="$(find-pkg-share points_prefiltering)/launch/points_prefiltering.launch.xml"/>
+  <include file="$(find-pkg-share points_prefiltering)/launch/points_prefiltering.launch.xml">
+    <arg name="use_sim_time" value="$(var use_sim_time)"/>
+  </include>
 
-  <include file="$(find-pkg-share lidar_scan_matcher)/launch/lidar_scan_matcher.launch.xml"/>
+  <include file="$(find-pkg-share lidar_scan_matcher)/launch/lidar_scan_matcher.launch.xml">
+    <arg name="use_sim_time" value="$(var use_sim_time)"/>
+  </include>
 
-  <include file="$(find-pkg-share graph_based_slam)/launch/graph_based_slam.launch.xml"/>
+  <include file="$(find-pkg-share graph_based_slam)/launch/graph_based_slam.launch.xml">
+    <arg name="use_sim_time" value="$(var use_sim_time)"/>
+  </include>
 
   <group if="$(var rviz)">
     <node pkg="rviz2" exec="rviz2" name="rviz2" args="-d $(var rviz_config)"/>
