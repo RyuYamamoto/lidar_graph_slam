@@ -104,6 +104,9 @@ private:
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr accepted_loop_publisher_;
 
   rclcpp::TimerBase::SharedPtr timer_;
+  // Separate group so the (heavy) loop-closure timer runs concurrently with key_frame_callback
+  // under a multi-threaded executor (e.g. the composed component_container_mt).
+  rclcpp::CallbackGroup::SharedPtr optimization_callback_group_;
 
   rclcpp::Service<lidar_graph_slam_msgs::srv::SaveMap>::SharedPtr save_map_service_;
 
