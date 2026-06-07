@@ -1,0 +1,10 @@
+# Goal: where to save and the down-sampling leaf size (<= 0 saves the dense map as-is).
+float32 resolution
+string path
+---
+# Result
+bool success
+string message
+---
+# Feedback: fraction of key frames accumulated into the map so far (0.0 - 1.0).
+float32 progress

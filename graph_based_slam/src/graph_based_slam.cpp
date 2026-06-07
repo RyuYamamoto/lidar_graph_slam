@@ -22,6 +22,8 @@
 
 #include "graph_based_slam/graph_based_slam.hpp"
 
+#include <thread>
+
 using namespace lidar_graph_slam_utils;
 
 namespace
@@ -56,10 +58,11 @@ GraphBasedSLAM::GraphBasedSLAM(const rclcpp::NodeOptions & node_options)
   modified_map_publisher_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
     "modified_map", rclcpp::QoS{1}.transient_local());
 
-  save_map_service_ = this->create_service<lidar_graph_slam_msgs::srv::SaveMap>(
-    "save_map",
-    std::bind(
-      &GraphBasedSLAM::save_map_service, this, std::placeholders::_1, std::placeholders::_2));
+  save_map_action_server_ = rclcpp_action::create_server<SaveMap>(
+    this, "save_map",
+    std::bind(&GraphBasedSLAM::handle_save_map_goal, this, std::placeholders::_1, std::placeholders::_2),
+    std::bind(&GraphBasedSLAM::handle_save_map_cancel, this, std::placeholders::_1),
+    std::bind(&GraphBasedSLAM::handle_save_map_accepted, this, std::placeholders::_1));
 
   kd_tree_.reset(new pcl::KdTreeFLANN<PointType>());
   key_frame_point_.reset(new pcl::PointCloud<PointType>);
@@ -570,46 +573,94 @@ void GraphBasedSLAM::publish_map()
   modified_map_publisher_->publish(map_msg);
 }
 
-bool GraphBasedSLAM::save_map_service(
-  const lidar_graph_slam_msgs::srv::SaveMap::Request::SharedPtr req,
-  lidar_graph_slam_msgs::srv::SaveMap::Response::SharedPtr res)
+rclcpp_action::GoalResponse GraphBasedSLAM::handle_save_map_goal(
+  const rclcpp_action::GoalUUID & /*uuid*/, std::shared_ptr<const SaveMap::Goal> goal)
 {
-  // Snapshot the key frames under the lock, then build the map from the copy without holding it
-  // (the service runs in a different callback group than the SLAM callbacks under a MT executor).
+  RCLCPP_INFO(
+    get_logger(), "save_map goal received: path=%s resolution=%.3f", goal->path.c_str(),
+    goal->resolution);
+  return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
+}
+
+rclcpp_action::CancelResponse GraphBasedSLAM::handle_save_map_cancel(
+  const std::shared_ptr<GoalHandleSaveMap> /*goal_handle*/)
+{
+  RCLCPP_INFO(get_logger(), "save_map goal canceled");
+  return rclcpp_action::CancelResponse::ACCEPT;
+}
+
+void GraphBasedSLAM::handle_save_map_accepted(const std::shared_ptr<GoalHandleSaveMap> goal_handle)
+{
+  // Run the (potentially long) map build + save on its own thread so the executor is not blocked.
+  std::thread{std::bind(&GraphBasedSLAM::execute_save_map, this, std::placeholders::_1), goal_handle}
+    .detach();
+}
+
+void GraphBasedSLAM::execute_save_map(const std::shared_ptr<GoalHandleSaveMap> goal_handle)
+{
+  const auto goal = goal_handle->get_goal();
+  auto feedback = std::make_shared<SaveMap::Feedback>();
+  auto result = std::make_shared<SaveMap::Result>();
+
+  // Snapshot the key frames under the lock, then build the dense map from the copy without holding
+  // it (this action runs in its own thread, concurrently with the SLAM callbacks).
   lidar_graph_slam_msgs::msg::KeyFrameArray key_frames;
   {
     std::lock_guard<std::mutex> lock(graph_mutex_);
     key_frames = key_frame_array_;
   }
 
-  pcl::PointCloud<PointType>::Ptr map(new pcl::PointCloud<PointType>);
-  for (std::size_t idx = 0; idx < key_frames.keyframes.size(); idx++) {
+  const std::size_t total = key_frames.keyframes.size();
+  if (total == 0) {
+    result->success = false;
+    result->message = "no key frames to save";
+    goal_handle->abort(result);
+    return;
+  }
+
+  // Build the dense (full-resolution) map.
+  pcl::PointCloud<PointType>::Ptr dense_map(new pcl::PointCloud<PointType>);
+  for (std::size_t idx = 0; idx < total; idx++) {
+    if (goal_handle->is_canceling()) {
+      result->success = false;
+      result->message = "canceled";
+      goal_handle->canceled(result);
+      return;
+    }
+
     pcl::PointCloud<PointType>::Ptr key_frame_cloud(new pcl::PointCloud<PointType>);
     pcl::fromROSMsg(key_frames.keyframes[idx].cloud, *key_frame_cloud);
-
-    pcl::PointCloud<PointType>::Ptr transformed_cloud(new pcl::PointCloud<PointType>);
     const Eigen::Matrix4f matrix = geometry_pose_to_matrix(key_frames.keyframes[idx].pose);
-    transformed_cloud = transform_point_cloud(key_frame_cloud, matrix);
+    *dense_map += *transform_point_cloud(key_frame_cloud, matrix);
 
-    *map += *transformed_cloud;
+    feedback->progress = static_cast<float>(idx + 1) / static_cast<float>(total);
+    goal_handle->publish_feedback(feedback);
   }
 
+  // Down-sample the dense map before saving (resolution <= 0 saves the dense map as-is).
   pcl::PointCloud<PointType>::Ptr map_cloud(new pcl::PointCloud<PointType>);
-
-  if (req->resolution <= 0.0) {
-    map_cloud = map;
+  if (goal->resolution <= 0.0f) {
+    map_cloud = dense_map;
   } else {
     pcl::VoxelGrid<PointType> voxel_grid_filter;
-    voxel_grid_filter.setLeafSize(req->resolution, req->resolution, req->resolution);
-    voxel_grid_filter.setInputCloud(map);
+    voxel_grid_filter.setLeafSize(goal->resolution, goal->resolution, goal->resolution);
+    voxel_grid_filter.setInputCloud(dense_map);
     voxel_grid_filter.filter(*map_cloud);
   }
-
   map_cloud->header.frame_id = "map";
-  int ret = pcl::io::savePCDFile(req->path, *map_cloud);
-  res->ret = (ret == 0);
 
-  return true;
+  const int ret = pcl::io::savePCDFileBinary(goal->path, *map_cloud);
+  result->success = (ret == 0);
+  if (result->success) {
+    result->message =
+      "saved " + std::to_string(map_cloud->size()) + " points to " + goal->path;
+    RCLCPP_INFO(get_logger(), "%s", result->message.c_str());
+    goal_handle->succeed(result);
+  } else {
+    result->message = "failed to write PCD to " + goal->path;
+    RCLCPP_ERROR(get_logger(), "%s", result->message.c_str());
+    goal_handle->abort(result);
+  }
 }
 
 #include "rclcpp_components/register_node_macro.hpp"
