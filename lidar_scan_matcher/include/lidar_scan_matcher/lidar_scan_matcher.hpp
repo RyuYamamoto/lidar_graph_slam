@@ -105,6 +105,7 @@ private:
   Eigen::Matrix4f key_frame_;
   Eigen::Matrix4f translation_;
   Eigen::Matrix4f prev_translation_;
+  Eigen::Matrix4f prev_prev_translation_;
 
   geometry_msgs::msg::Pose current_pose_;
 
