@@ -2,6 +2,10 @@
 
 **InProgress**
 
+## Demo
+
+<video src="https://github.com/RyuYamamoto/lidar_graph_slam/raw/main/doc/lidar_slam.mp4" controls width="640"></video>
+
 ## System OverView
 ![overview](doc/system_overview.png)
 
@@ -27,8 +31,6 @@ ros2 launch lidar_graph_slam lidar_graph_slam.launch.xml
 ros2 service call /save_map lidar_graph_slam_msgs/srv/SaveMap "{resolution: 0.2, path: "<MAP PATH>"}"
 
 ```
-
-[![](https://img.youtube.com/vi/hhWxuyCu7Us/0.jpg)](https://www.youtube.com/watch?v=hhWxuyCu7Us)
 
 ## ToDo
 - [x] graph based SLAM(loop detect)
