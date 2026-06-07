@@ -2,9 +2,7 @@
 
 **InProgress**
 
-## Demo
-
-<video src="https://github.com/RyuYamamoto/lidar_graph_slam/raw/main/doc/lidar_slam.mp4" controls width="640"></video>
+https://github.com/user-attachments/assets/e2a65a66-5f91-484e-8aab-1fc81b32b6aa
 
 ## System OverView
 ![overview](doc/system_overview.png)
