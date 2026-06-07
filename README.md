@@ -22,12 +22,13 @@ colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
 
 ## 2. run
 ```bash
-ros2 launch lidar_graph_slam lidar_graph_slam.launch.xml
+ros2 launch lidar_graph_slam lidar_graph_slam.launch.py
 ```
 ## 3. save map
+The map is saved via an action. `resolution` is the voxel leaf size [m] used to
+down-sample the dense map before saving (set `0.0` to save the dense map as-is).
 ```bash
-ros2 service call /save_map lidar_graph_slam_msgs/srv/SaveMap "{resolution: 0.2, path: "<MAP PATH>"}"
-
+ros2 action send_goal /save_map lidar_graph_slam_msgs/action/SaveMap "{resolution: 0.2, path: <MAP PATH>}"
 ```
 
 ## ToDo
