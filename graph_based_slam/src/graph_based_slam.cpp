@@ -104,9 +104,10 @@ GraphBasedSLAM::GraphBasedSLAM(const rclcpp::NodeOptions & node_options)
   accepted_loop_marker_.pose.orientation.w = 1.0;
 
   const double rate = declare_parameter<double>("rate");
+  optimization_callback_group_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   timer_ = rclcpp::create_timer(
     this, get_clock(), rclcpp::Rate(rate).period(),
-    std::bind(&GraphBasedSLAM::optimization_callback, this));
+    std::bind(&GraphBasedSLAM::optimization_callback, this), optimization_callback_group_);
 }
 
 pcl::Registration<PointType, PointType>::Ptr GraphBasedSLAM::get_registration(
@@ -269,97 +270,94 @@ bool GraphBasedSLAM::detect_loop_with_kd_tree(
 
 void GraphBasedSLAM::optimization_callback()
 {
-  std::lock_guard<std::mutex> lock(graph_mutex_);
-
-  if (key_frame_array_.keyframes.empty()) return;
-
-  // Skip new loop detection until the previous closure has been applied by adjust_pose (on the
-  // next key frame). Otherwise the timer keeps re-detecting the same candidate on still-drifted
-  // poses and adds duplicate loop factors, over-constraining that location.
-  if (is_loop_closed_) return;
-
-  const int key_frame_size = key_frame_array_.keyframes.size();
-  const auto latest_key_frame = key_frame_array_.keyframes.back();
-  pcl::PointCloud<PointType>::Ptr nearest_key_frame_cloud(new pcl::PointCloud<PointType>);
-
-  pcl::PointCloud<PointType>::Ptr latest_key_frame_cloud(new pcl::PointCloud<PointType>);
-  pcl::fromROSMsg(latest_key_frame.cloud, *latest_key_frame_cloud);
-  pcl::PointCloud<PointType>::Ptr transformed_key_frame_cloud(new pcl::PointCloud<PointType>);
-  const Eigen::Matrix4f matrix = geometry_pose_to_matrix(latest_key_frame.pose);
-  transformed_key_frame_cloud = transform_point_cloud(latest_key_frame_cloud, matrix);
-
-  Eigen::Matrix4f correct_frame;
-
-  double min_dist = std::numeric_limits<double>::max();
+  // ---- Phase 1: take a snapshot under the lock (cheap: candidate search + copy clouds) ----
+  int key_frame_size = 0;
   int min_id = -1;
+  lidar_graph_slam_msgs::msg::KeyFrame latest_key_frame;
+  geometry_msgs::msg::Pose candidate_pose;
+  std::vector<lidar_graph_slam_msgs::msg::KeyFrame> candidate_region;  // for the target sub-map
+  {
+    std::lock_guard<std::mutex> lock(graph_mutex_);
 
-  const Eigen::Vector3d latest_pose{
-    latest_key_frame.pose.position.x, latest_key_frame.pose.position.y,
-    latest_key_frame.pose.position.z};
-  const double latest_accum_dist = latest_key_frame.accum_distance;
+    if (key_frame_array_.keyframes.empty()) return;
 
-  for (int id = 0; id < key_frame_size; id++) {
-    auto key_frame = key_frame_array_.keyframes[id];
-    if ((latest_accum_dist - key_frame.accum_distance) < accumulate_distance_threshold_) {
-      continue;
-    }
+    // Skip new loop detection until the previous closure has been applied by adjust_pose (on the
+    // next key frame). Otherwise the timer keeps re-detecting the same candidate on still-drifted
+    // poses and adds duplicate loop factors, over-constraining that location.
+    if (is_loop_closed_) return;
 
-    const Eigen::Vector3d key_frame_pose{
-      key_frame.pose.position.x, key_frame.pose.position.y, key_frame.pose.position.z};
+    key_frame_size = key_frame_array_.keyframes.size();
+    latest_key_frame = key_frame_array_.keyframes.back();
 
-    const double key_frame_dist = (latest_pose - key_frame_pose).norm();
-    if (key_frame_dist < search_for_candidate_threshold_) {
-      if (key_frame_dist < min_dist) {
+    const Eigen::Vector3d latest_position{
+      latest_key_frame.pose.position.x, latest_key_frame.pose.position.y,
+      latest_key_frame.pose.position.z};
+    const double latest_accum_dist = latest_key_frame.accum_distance;
+
+    double min_dist = std::numeric_limits<double>::max();
+    for (int id = 0; id < key_frame_size; id++) {
+      const auto & key_frame = key_frame_array_.keyframes[id];
+      if ((latest_accum_dist - key_frame.accum_distance) < accumulate_distance_threshold_) continue;
+      const Eigen::Vector3d key_frame_position{
+        key_frame.pose.position.x, key_frame.pose.position.y, key_frame.pose.position.z};
+      const double key_frame_dist = (latest_position - key_frame_position).norm();
+      if (key_frame_dist < search_for_candidate_threshold_ && key_frame_dist < min_dist) {
         min_dist = key_frame_dist;
         min_id = id;
       }
     }
-  }
+    if (min_id == -1) return;
 
-  if (min_id == -1) return;
+    candidate_pose = key_frame_array_.keyframes[min_id].pose;
 
-  {
+    // Copy the candidate-region key frames so the heavy sub-map build + registration below can run
+    // without holding the lock (key frames are only appended, never removed, while is_loop_closed_
+    // is false, so these indices and poses stay valid).
+    for (int idx = -search_key_frame_num_; idx <= search_key_frame_num_; idx++) {
+      const int j = min_id + idx;
+      if (j < 0 or key_frame_size <= j) continue;
+      candidate_region.emplace_back(key_frame_array_.keyframes[j]);
+    }
+
+    candidate_line_.poses.clear();
+    geometry_msgs::msg::PoseStamped pose_from;
+    pose_from.pose = candidate_pose;
+    pose_from.header = key_frame_array_.keyframes[min_id].header;
     geometry_msgs::msg::PoseStamped pose_to;
     pose_to.pose = latest_key_frame.pose;
     pose_to.header = latest_key_frame.header;
-    geometry_msgs::msg::PoseStamped pose_from;
-    pose_from.pose = key_frame_array_.keyframes[min_id].pose;
-    pose_from.header = key_frame_array_.keyframes[min_id].header;
-    candidate_line_.poses.clear();
     candidate_line_.poses.emplace_back(pose_from);
     candidate_line_.poses.emplace_back(pose_to);
     candidate_line_.header.frame_id = "map";
     candidate_line_.header.stamp = latest_key_frame.header.stamp;
   }
+  candidate_key_frame_publisher_->publish(candidate_line_);
 
-  for (int idx = -search_key_frame_num_; idx <= search_key_frame_num_; idx++) {
-    int key_frame_cloud_idx = min_id + idx;
-    if (key_frame_cloud_idx < 0 or key_frame_size <= key_frame_cloud_idx) continue;
+  // ---- Phase 2: heavy sub-map build + registration WITHOUT the lock (does not block ingestion) --
+  pcl::PointCloud<PointType>::Ptr latest_cloud(new pcl::PointCloud<PointType>);
+  pcl::fromROSMsg(latest_key_frame.cloud, *latest_cloud);
+  pcl::PointCloud<PointType>::Ptr source_cloud =
+    transform_point_cloud(latest_cloud, geometry_pose_to_matrix(latest_key_frame.pose));
 
-    pcl::PointCloud<PointType>::Ptr tmp_cloud(new pcl::PointCloud<PointType>);
-    pcl::fromROSMsg(key_frame_array_.keyframes[key_frame_cloud_idx].cloud, *tmp_cloud);
-
-    pcl::PointCloud<PointType>::Ptr transformed_cloud(new pcl::PointCloud<PointType>);
-    const Eigen::Matrix4f matrix =
-      geometry_pose_to_matrix(key_frame_array_.keyframes[key_frame_cloud_idx].pose);
-    transformed_cloud = transform_point_cloud(tmp_cloud, matrix);
-    *nearest_key_frame_cloud += *transformed_cloud;
+  pcl::PointCloud<PointType>::Ptr nearest_key_frame_cloud(new pcl::PointCloud<PointType>);
+  for (const auto & key_frame : candidate_region) {
+    pcl::PointCloud<PointType>::Ptr cloud(new pcl::PointCloud<PointType>);
+    pcl::fromROSMsg(key_frame.cloud, *cloud);
+    *nearest_key_frame_cloud += *transform_point_cloud(cloud, geometry_pose_to_matrix(key_frame.pose));
   }
 
-  pcl::PointCloud<PointType>::Ptr tmp_cloud(new pcl::PointCloud<PointType>);
+  pcl::PointCloud<PointType>::Ptr filtered_target(new pcl::PointCloud<PointType>);
   voxel_grid_.setInputCloud(nearest_key_frame_cloud);
-  voxel_grid_.filter(*tmp_cloud);
+  voxel_grid_.filter(*filtered_target);
 
-  registration_->setInputTarget(tmp_cloud);
-  registration_->setInputSource(transformed_key_frame_cloud);
+  registration_->setInputTarget(filtered_target);
+  registration_->setInputSource(source_cloud);
   pcl::PointCloud<PointType>::Ptr output_cloud(new pcl::PointCloud<PointType>);
   registration_->align(*output_cloud);
 
   const Eigen::Matrix4f transform = registration_->getFinalTransformation();
   const double fitness_score = registration_->getFitnessScore();
   const bool has_converged = registration_->hasConverged();
-
-  candidate_key_frame_publisher_->publish(candidate_line_);
 
   if (!has_converged or score_threshold_ < fitness_score) {
     RCLCPP_INFO(
@@ -371,11 +369,10 @@ void GraphBasedSLAM::optimization_callback()
     get_logger(), "loop candidate ACCEPTED (latest=%d, min_id=%d): fitness=%.4f",
     key_frame_size - 1, min_id, fitness_score);
 
-  // correct position
-  auto pose_from = geometry_pose_to_gtsam_pose(
+  // correct position / candidate position (computed from the snapshot, so self-consistent)
+  const auto pose_from = geometry_pose_to_gtsam_pose(
     convert_matrix_to_pose(transform * geometry_pose_to_matrix(latest_key_frame.pose)));
-  // candidate position
-  auto pose_to = geometry_pose_to_gtsam_pose(key_frame_array_.keyframes[min_id].pose);
+  const auto pose_to = geometry_pose_to_gtsam_pose(candidate_pose);
   // Loop-closure noise scaled by the registration fitness score, with rotation and
   // translation treated separately and clamped to sane floors. Order: [rx, ry, rz, x, y, z].
   const double loop_translation_variance = std::max(1e-2, fitness_score);
@@ -385,24 +382,27 @@ void GraphBasedSLAM::optimization_callback()
     loop_translation_variance, loop_translation_variance, loop_translation_variance;
   gtsam::noiseModel::Diagonal::shared_ptr optimize_noise =
     gtsam::noiseModel::Diagonal::Variances(loop_variance);
-  graph_.add(gtsam::BetweenFactor<gtsam::Pose3>(
-    key_frame_size - 1, min_id, pose_from.between(pose_to), optimize_noise));
 
-  // visualize the accepted loop edge (latest key frame <-> matched candidate) in cyan.
-  accepted_loop_marker_.points.emplace_back(latest_key_frame.pose.position);
-  accepted_loop_marker_.points.emplace_back(key_frame_array_.keyframes[min_id].pose.position);
-  accepted_loop_marker_.header.stamp = now();
-  visualization_msgs::msg::MarkerArray accepted_loop_markers;
-  accepted_loop_markers.markers.emplace_back(accepted_loop_marker_);
-  accepted_loop_publisher_->publish(accepted_loop_markers);
+  // ---- Phase 3: add the loop factor and optimize under the lock (cheap) ----
+  {
+    std::lock_guard<std::mutex> lock(graph_mutex_);
+    graph_.add(gtsam::BetweenFactor<gtsam::Pose3>(
+      key_frame_size - 1, min_id, pose_from.between(pose_to), optimize_noise));
 
-  // update
-  optimizer_->update(graph_);
-  optimizer_->update();
+    // visualize the accepted loop edge (latest key frame <-> matched candidate) in cyan.
+    accepted_loop_marker_.points.emplace_back(latest_key_frame.pose.position);
+    accepted_loop_marker_.points.emplace_back(candidate_pose.position);
+    accepted_loop_marker_.header.stamp = now();
+    visualization_msgs::msg::MarkerArray accepted_loop_markers;
+    accepted_loop_markers.markers.emplace_back(accepted_loop_marker_);
+    accepted_loop_publisher_->publish(accepted_loop_markers);
 
-  graph_.resize(0);
+    optimizer_->update(graph_);
+    optimizer_->update();
+    graph_.resize(0);
 
-  is_loop_closed_ = true;
+    is_loop_closed_ = true;
+  }
 }
 
 void GraphBasedSLAM::key_frame_callback(const lidar_graph_slam_msgs::msg::KeyFrame::SharedPtr msg)
@@ -574,13 +574,21 @@ bool GraphBasedSLAM::save_map_service(
   const lidar_graph_slam_msgs::srv::SaveMap::Request::SharedPtr req,
   lidar_graph_slam_msgs::srv::SaveMap::Response::SharedPtr res)
 {
+  // Snapshot the key frames under the lock, then build the map from the copy without holding it
+  // (the service runs in a different callback group than the SLAM callbacks under a MT executor).
+  lidar_graph_slam_msgs::msg::KeyFrameArray key_frames;
+  {
+    std::lock_guard<std::mutex> lock(graph_mutex_);
+    key_frames = key_frame_array_;
+  }
+
   pcl::PointCloud<PointType>::Ptr map(new pcl::PointCloud<PointType>);
-  for (std::size_t idx = 0; idx < key_frame_array_.keyframes.size(); idx++) {
+  for (std::size_t idx = 0; idx < key_frames.keyframes.size(); idx++) {
     pcl::PointCloud<PointType>::Ptr key_frame_cloud(new pcl::PointCloud<PointType>);
-    pcl::fromROSMsg(key_frame_array_.keyframes[idx].cloud, *key_frame_cloud);
+    pcl::fromROSMsg(key_frames.keyframes[idx].cloud, *key_frame_cloud);
 
     pcl::PointCloud<PointType>::Ptr transformed_cloud(new pcl::PointCloud<PointType>);
-    const Eigen::Matrix4f matrix = geometry_pose_to_matrix(key_frame_array_.keyframes[idx].pose);
+    const Eigen::Matrix4f matrix = geometry_pose_to_matrix(key_frames.keyframes[idx].pose);
     transformed_cloud = transform_point_cloud(key_frame_cloud, matrix);
 
     *map += *transformed_cloud;
