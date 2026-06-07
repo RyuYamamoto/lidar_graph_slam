@@ -26,10 +26,11 @@
 #include <fast_gicp/gicp/fast_gicp.hpp>
 #include <lidar_graph_slam_utils/lidar_graph_slam_utils.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <rclcpp_action/rclcpp_action.hpp>
 
+#include "lidar_graph_slam_msgs/action/save_map.hpp"
 #include "lidar_graph_slam_msgs/msg/key_frame.hpp"
 #include "lidar_graph_slam_msgs/msg/key_frame_array.hpp"
-#include "lidar_graph_slam_msgs/srv/save_map.hpp"
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <nav_msgs/msg/path.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
@@ -45,6 +46,7 @@
 #include <gtsam/slam/BetweenFactor.h>
 #include <gtsam/slam/PriorFactor.h>
 #include <pcl/filters/voxel_grid.h>
+#include <pcl/io/pcd_io.h>
 #include <pcl/kdtree/kdtree_flann.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
@@ -59,6 +61,9 @@ using PointType = pcl::PointXYZI;
 class GraphBasedSLAM : public rclcpp::Node
 {
 public:
+  using SaveMap = lidar_graph_slam_msgs::action::SaveMap;
+  using GoalHandleSaveMap = rclcpp_action::ServerGoalHandle<SaveMap>;
+
   GraphBasedSLAM(const rclcpp::NodeOptions & node_options);
   ~GraphBasedSLAM() = default;
 
@@ -89,9 +94,12 @@ public:
   pcl::Registration<PointType, PointType>::Ptr get_registration(
     const std::string & registration_method);
 
-  bool save_map_service(
-    const lidar_graph_slam_msgs::srv::SaveMap::Request::SharedPtr req,
-    lidar_graph_slam_msgs::srv::SaveMap::Response::SharedPtr res);
+  rclcpp_action::GoalResponse handle_save_map_goal(
+    const rclcpp_action::GoalUUID & uuid, std::shared_ptr<const SaveMap::Goal> goal);
+  rclcpp_action::CancelResponse handle_save_map_cancel(
+    const std::shared_ptr<GoalHandleSaveMap> goal_handle);
+  void handle_save_map_accepted(const std::shared_ptr<GoalHandleSaveMap> goal_handle);
+  void execute_save_map(const std::shared_ptr<GoalHandleSaveMap> goal_handle);
 
 private:
   rclcpp::Subscription<lidar_graph_slam_msgs::msg::KeyFrame>::SharedPtr key_frame_subscriber_;
@@ -108,7 +116,7 @@ private:
   // under a multi-threaded executor (e.g. the composed component_container_mt).
   rclcpp::CallbackGroup::SharedPtr optimization_callback_group_;
 
-  rclcpp::Service<lidar_graph_slam_msgs::srv::SaveMap>::SharedPtr save_map_service_;
+  rclcpp_action::Server<SaveMap>::SharedPtr save_map_action_server_;
 
   // registration
   pcl::Registration<PointType, PointType>::Ptr registration_;
